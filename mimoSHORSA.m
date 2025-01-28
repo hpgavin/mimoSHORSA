@@ -1,7 +1,8 @@
 function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] = mimoSHORSA ( dataX,dataY, maxOrder, pTrain,pCull, tol, scaling )
 % [ order, coeff, trfrmX,trfrmY, meanX,meanY, testModelY, testX,testY ] = mimoSHORSA( dataX,dataY, maxOrder, pTrain,pCull, tol, scaling )
 %
-% multi-input multi-output High Order Response Surface   (mimoSHORSA)
+% mimoSHORSA
+% multi-input multi-output Stochastic High Order Response Surface Algorithm
 % 
 % This program fits a high order polynomial to multidimensional data via
 % the high order response surface (mimoSHORSA) method 
@@ -18,7 +19,7 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 % INPUT       DESCRIPTION                                                DEFAULT
 % --------    --------------------------------------------------------   -------
 % dataX       m observations of n input  features in a (nx x m) matrix
-% dataY       m observations of 1 output feature  in a (ny x m) vector
+% dataY       m observations of m output features in a (ny x m) matrix
 % maxOrder    maximum allowable polynomial order                            3
 % pTrain      percentage of data for training (remaining for testing)      50
 % pCull       maximum percentage of model which may be culled              30 
@@ -41,7 +42,6 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 %  testModelY output features for model testing
 %  testX      input  features for model testing 
 %  testY      output features for model testing 
-%
 %
 % get rainbow.m from ... http://www.duke.edu/~hpgavin/m-files/rainbow.m
 
