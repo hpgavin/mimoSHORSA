@@ -7,7 +7,8 @@
 ## Usage
 
 ```
-% [ order, coeff, trfrmX,trfrmY, meanX,meanY, testModelY, testX,testY ] = mimoSHORSA( dataX,dataY, maxOrder, pTrain,pCull, tol, scaling )
+% [ order, coeff, trfrmX,trfrmY, meanX,meanY, testModelY, testX,testY ] = ...
+%                mimoSHORSA( dataX,dataY, maxOrder, pTrain,pCull, tol, scaling )
 %
 % mimoSHORSA
 % multi-input multi-output Stochastic High Order Response Surface Algorithm
