@@ -271,7 +271,7 @@ function [order, orderR2] = polynomial_orders(maxOrder)
     zMin = min(Zx(i,:)); 
     zMap(i,:) = ( zMax+zMin + z*(zMax-zMin) ) / 2;
 
-  % interpolate the data at the Chybyshev sampling points
+  % interpolate the data at the Chebyshev sampling points
     y = IDWinterp( Zx', Zy', zMap', 2, 10, 0.1 );
 
     for ki = order(i) : maxOrder   % loop over possible polynomial orders
