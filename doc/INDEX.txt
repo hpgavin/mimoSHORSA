@@ -1,0 +1,100 @@
+================================================================================
+                    mimoSHORSA Python Translation
+                Complete Package - File Organization
+================================================================================
+
+START HERE:
+-----------
+📄 QUICKSTART.md          - Quick start guide (read this first!)
+                           Installation, basic example, common parameters
+
+MAIN CODE:
+----------
+🐍 mimoSHORSA.py          - Python implementation (25 KB)
+                           All functions translated from MATLAB
+                           Matrix operations preserved
+                           
+📋 requirements.txt       - Package dependencies
+                           numpy, scipy, matplotlib
+
+EXAMPLES:
+---------
+📝 example_usage.py       - 4 comprehensive examples
+                           Run with: python example_usage.py
+                           • Example 1: Simple 2D polynomial
+                           • Example 2: Multi-output system
+                           • Example 3: High-dimensional problem
+                           • Example 4: Scaling comparison
+
+DOCUMENTATION:
+--------------
+📖 README.md              - Complete documentation (8.5 KB)
+                           • Full parameter descriptions
+                           • Function references
+                           • Mathematical formulation
+                           • Usage examples
+                           
+🔄 TRANSLATION_NOTES.md   - MATLAB to Python guide (11 KB)
+                           • Syntax translations
+                           • Function-by-function comparison
+                           • Common pitfalls
+                           • Performance tips
+
+FILE SIZES:
+-----------
+mimoSHORSA.py          : 25 KB (810 lines)
+README.md              : 8.5 KB
+TRANSLATION_NOTES.md   : 11 KB
+example_usage.py       : 8.8 KB
+QUICKSTART.md          : 6.0 KB
+requirements.txt       : 146 bytes
+
+RECOMMENDED READING ORDER:
+--------------------------
+1. QUICKSTART.md          ← Start here!
+2. example_usage.py       ← Run examples
+3. README.md              ← Full documentation
+4. TRANSLATION_NOTES.md   ← If coming from MATLAB
+5. mimoSHORSA.py          ← Source code
+
+QUICK INSTALLATION:
+-------------------
+$ pip install -r requirements.txt
+$ python example_usage.py
+
+QUICK USAGE:
+------------
+from mimoSHORSA import mimoSHORSA
+order, coeff, *_ = mimoSHORSA(dataX, dataY, maxOrder=3, 
+                               pTrain=70, pCull=30, tol=0.15, scaling=1)
+
+KEY FEATURES:
+-------------
+✅ Complete MATLAB translation
+✅ All matrix operations preserved  
+✅ Same function organization
+✅ Hermite polynomial basis
+✅ Automatic model reduction
+✅ Multiple scaling options
+✅ Train/test splitting
+✅ Statistical evaluation (R², correlation, COV)
+
+FUNCTIONS INCLUDED:
+-------------------
+• mimoSHORSA()          - Main algorithm
+• split_data()          - Train/test splitting
+• scale_data()          - Data normalization
+• mixed_term_powers()   - Term generation
+• fit_model()           - Least squares fitting
+• compute_model()       - Predictions
+• evaluate_model()      - Statistics
+• cull_model()          - Term removal
+• print_model_stats()   - Output formatting
+
+SUPPORT:
+--------
+Original MATLAB: H.P. Gavin & S.C. Yau, Duke University
+Python Translation: 2025
+Reference: Gavin & Yau (2008), Structural Safety
+
+================================================================================

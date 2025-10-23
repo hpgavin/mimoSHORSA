@@ -1,0 +1,173 @@
+===========================================================================
+                  mimoSHORSA - Quick Reference Card                   
+===========================================================================
+
+BASIC USAGE:
+---------------------------------------------------------------------------
+from mimoSHORSA import mimoSHORSA
+
+order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY = \
+    mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=70, pCull=30, 
+               tol=0.15, scaling=1)
+
+PARAMETERS:
+---------------------------------------------------------------------------
+dataX       : Input data (nInp × mData)                      [required]
+dataY       : Output data (nOut × mData)                     [required]
+maxOrder    : Max polynomial order (2-4 typical)            [default: 3]
+pTrain      : % data for training (60-80 typical)           [default: 50]
+pCull       : Max % terms to remove (20-40 typical)         [default: 30]
+tol         : Max coeff. variation (0.10-0.25 typical)      [default: 0.10]
+scaling     : Data scaling method (0-4)                     [default: 0]
+
+SCALING OPTIONS:
+---------------------------------------------------------------------------
+0 : No scaling
+1 : Standardize (mean=0, std=1)          ← RECOMMENDED FOR MOST CASES
+2 : Decorrelate (whitening)              ← For correlated inputs
+3 : Log + standardize                    ← For exponential data
+4 : Log + decorrelate                    ← For exponential + correlated
+
+RETURNS:
+---------------------------------------------------------------------------
+order       : List of term powers for each output
+coeff       : List of coefficients for each output
+meanX       : Input data mean vector
+meanY       : Output data mean vector
+trfrmX      : Input transformation matrix
+trfrmY      : Output transformation matrix
+testModelY  : Model predictions on test data
+testX       : Test input data
+testY       : Test output data
+
+KEY FUNCTIONS:
+---------------------------------------------------------------------------
+mimoSHORSA()        - Main algorithm
+split_data()        - Split into train/test
+scale_data()        - Apply scaling
+fit_model()         - Least squares fit
+compute_model()     - Make predictions
+evaluate_model()    - Compute statistics
+
+DATA FORMAT:
+---------------------------------------------------------------------------
+Input:  dataX.shape = (n_inputs, n_samples)
+Output: dataY.shape = (n_outputs, n_samples)
+
+Example:
+  3 inputs, 2 outputs, 100 samples
+  dataX: (3, 100)
+  dataY: (2, 100)
+
+TYPICAL WORKFLOW:
+---------------------------------------------------------------------------
+1. Prepare data matrices (dataX, dataY)
+2. Choose parameters (start conservative)
+3. Call mimoSHORSA()
+4. Inspect order and coeff
+5. Evaluate on test data (testModelY vs testY)
+6. Adjust parameters if needed
+
+INSTALLATION:
+---------------------------------------------------------------------------
+pip install numpy scipy matplotlib
+
+Or use requirements.txt:
+pip install -r requirements.txt
+
+MINIMAL EXAMPLE:
+---------------------------------------------------------------------------
+import numpy as np
+from mimoSHORSA import mimoSHORSA
+
+# Your data
+dataX = np.random.randn(3, 100)  # 3 inputs, 100 samples
+dataY = np.random.randn(2, 100)  # 2 outputs, 100 samples
+
+# Fit
+order, coeff, *_ = mimoSHORSA(dataX, dataY)
+
+# Results
+print(f"Output 0: {len(coeff[0])} terms")
+print(f"Output 1: {len(coeff[1])} terms")
+
+TROUBLESHOOTING:
+---------------------------------------------------------------------------
+Poor fit?           Try scaling=1
+Still poor?         Increase maxOrder (carefully!)
+Numerical issues?   Use scaling=1 or 2
+Overfitting?        Decrease tol, increase pCull
+Slow convergence?   Increase pCull
+
+MONITORING:
+---------------------------------------------------------------------------
+Watch for:
+    Model-data correlation (R^2): Should be > 0.9
+    Condition number: Should be < 1000
+    Coefficient of variation: Should decrease
+    Train vs test correlation: Should be similar
+
+OUTPUT INTERPRETATION:
+---------------------------------------------------------------------------
+order[io][it, :] = [p₁, p₂, ..., pₙ]
+  → Term: x₁^p₁ × x₂^p₂ × ... × xₙ^pₙ
+
+coeff[io][it]
+  → Coefficient for this term
+
+Example:
+  order[0][5, :] = [1, 2, 0]
+  coeff[0][5] = 0.35
+  → 0.35 × x₁¹ × x₂² × x₃⁰ = 0.35 × x₁ × x₂²
+
+PERFORMANCE TIPS:
+---------------------------------------------------------------------------
+    Start with maxOrder=2 or 3
+    Use scaling=1 for numerical stability
+    Monitor condition numbers
+    For high dimensions (>5), keep maxOrder≤2
+    More data can handle higher maxOrder
+
+FILES IN PACKAGE:
+---------------------------------------------------------------------------
+mimoSHORSA.py       - Main code (USE THIS)
+example_usage.py    - Examples (RUN THIS to learn)
+README.md           - Full docs (READ for details)
+QUICKSTART.md       - Quick guide (START HERE)
+TRANSLATION_NOTES.md- MATLAB comparison
+requirements.txt    - Dependencies
+
+ALGORITHM STEPS:
+---------------------------------------------------------------------------
+1. Split data                train/test
+2. Scale data                numerical stability
+3. Generate terms            polynomial basis
+4. Fit model                 least squares
+5. Evaluate                  R2, correlation, COV
+6. Remove uncertain term     highest COV
+7. Repeat 4-6                until convergence
+8. Return                    final model
+
+MATHEMATICAL MODEL:
+---------------------------------------------------------------------------
+y(X) = a₀ + Σᵢⱼ bᵢⱼ Hⱼ(Xᵢ) + Σₖ cₖ ∏ᵢ Hₚᵢₖ(Xᵢ)
+
+Where:
+• Hⱼ(x) = Hermite polynomial of order j
+• a₀ = constant term
+• bᵢⱼ = pure term coefficients
+• cₖ = mixed term coefficients
+
+CITATION:
+---------------------------------------------------------------------------
+Gavin, H.P. and Yau, S.C. (2008)
+"High order limit state functions in the response 
+surface method for structural reliability analysis"
+Structural Safety
+
+ORIGINAL: Duke University, 2006-2025
+PYTHON:   Translation, 2025
+
+===========================================================================
+          For more details, see README.md and QUICKSTART.md                    
+===========================================================================
