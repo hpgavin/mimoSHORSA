@@ -184,13 +184,13 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         plt.plot(np.arange(1, maxCull + 1), trainMDcorr[io, :maxCull], 'o', color=cMap[io, :])
         plt.plot(np.arange(1, maxCull + 1), testMDcorr[io, :maxCull], 'x', color=cMap[io, :])
     plt.ylabel('model-data correlation')
-    plt.legend(['train', 'test'], loc='west')
+    plt.legend(['train', 'test'], loc='center left')
     
     plt.subplot(2, 1, 2)
     for io in range(nOut):
         plt.semilogy(np.arange(1, maxCull + 1), condB[io, :maxCull], 'o', color=cMap[io, :])
         plt.semilogy(np.arange(1, maxCull + 1), coeffCOVmax[io, :maxCull], 'x', color=cMap[io, :])
-    plt.legend(['cond(B)', 'max(c.o.v.)'], loc='east')
+    plt.legend(['cond(B)', 'max(c.o.v.)'], loc='center right')
     plt.ylabel('maximum c.o.v.')
     plt.xlabel('model reduction')
     

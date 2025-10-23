@@ -35,7 +35,7 @@ def example_1_simple_polynomial():
                    2.0 * dataX[0, :] + 
                    0.5 * dataX[1, :] ** 2 + 
                    0.3 * dataX[0, :] * dataX[1, :] + 
-                   0.2 * np.random.randn(mData))
+                   0.1 * np.random.randn(mData))
     
     # Fit model
     print("\nFitting model...")
@@ -78,7 +78,7 @@ def example_2_multi_output():
                    1.0 * dataX[0, :] + 
                    0.5 * dataX[1, :] ** 2 + 
                    0.2 * dataX[0, :] * dataX[2, :] + 
-                   0.15 * np.random.randn(mData))
+                   0.05 * np.random.randn(mData))
     
     # Output 2: y2 = 0.5 + 1.5*x2 - 0.8*x3^2 + 0.3*x1*x2
     dataY[1, :] = (0.5 + 
@@ -132,7 +132,7 @@ def example_3_high_dimensional():
                    0.4 * dataX[3, :] +
                    0.3 * dataX[0, :] * dataX[1, :] +
                    0.2 * dataX[2, :] * dataX[4, :] +
-                   0.25 * np.random.randn(mData))
+                   0.05 * np.random.randn(mData))
     
     # Fit model with lower maximum order due to curse of dimensionality
     print("\nFitting high-dimensional model...")
@@ -176,7 +176,7 @@ def example_4_with_scaling():
     
     # Generate output
     dataY = np.zeros((nOut, mData))
-    dataY[0, :] = 0.01 * dataX[0, :] + 100 * dataX[1, :] ** 2 + np.random.randn(mData)
+    dataY[0, :] = 0.01 * dataX[0, :] + 100 * dataX[1, :] ** 2 + 0.1*np.random.randn(mData)
     
     scaling_names = {
         0: "No scaling",
