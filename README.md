@@ -58,7 +58,7 @@ A sophisticated polynomial regression method using Hermite function basis with a
 
 ---
 
-## 📦 Package Contents
+## Package Contents
 
 ### Core Implementation
 - **`mimoSHORSA.py`** - Complete Python implementation (~1000 lines)
@@ -96,7 +96,7 @@ A sophisticated polynomial regression method using Hermite function basis with a
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -137,7 +137,7 @@ python mimoSHORSA_test.py
 
 ---
 
-## 📚 Reference
+## Reference
 
 ### Primary Publication
 Gavin, H.P. and Yau, S.C., "High order limit state functions in the 

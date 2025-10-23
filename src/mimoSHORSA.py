@@ -696,6 +696,7 @@ def hermite(order, z):
     
     return psy
 
+
 def fit_model(trainZx, trainZy, order, nTerm, mTrain):
     '''
     [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData )
@@ -729,6 +730,7 @@ def fit_model(trainZx, trainZy, order, nTerm, mTrain):
     print(f'  condition number of model basis matrix = {condB:6.1f}')
     
     return coeff, condB
+
 
 def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling):
     '''
@@ -784,6 +786,7 @@ def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling):
         modelY = 10**(trfrmY @ modelZy.T + meanY)
     
     return modelY, B
+
 
 def evaluate_model(B, coeff, dataY, modelY, figNo):
     '''
@@ -868,6 +871,7 @@ def evaluate_model(B, coeff, dataY, modelY, figNo):
         plt.show(block=False)
     
     return MDcorr, coeffCOV, R2adj, AIC
+
 
 def print_model_stats(iter, coeff, order, coeffCOV, MDcorr, R2adj, scaling, maxCull):
     '''
@@ -978,6 +982,7 @@ def cull_model(coeff, order, coeffCOV, tol):
     
     return order, nTerm, coeffCOV
 
+
 def rainbow(n):
     '''
     Generate rainbow colormap with n colors
@@ -1032,3 +1037,4 @@ def IDWinterp(Zx, Zy, zMap, p, k, tol):
     '''
     pass
 
+# updated 2006-01-29, 2007-02-21, 2007-03-06, 2009-10-14, 2022-11-19 2023-02-27, 2023-05-31 2025-01-28, 2025-10-23
