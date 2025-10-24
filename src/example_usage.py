@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+''' ... from console 
+import importlib , example_usage
+importlib.reload(example_usage)     # to reload edits
+'''
 """
 Example usage of mimoSHORSA for polynomial response surface fitting
 
@@ -8,6 +12,15 @@ This script demonstrates:
 3. Evaluating model performance
 4. Visualizing results
 """
+'''
+    scaling     scale the data before fitting                                 1
+                scaling = 0 : no scaling
+                scaling = 1 : subtract mean and divide by std.dev
+                scaling = 2 : subtract mean and decorrelate
+                scaling = 3 : log-transform, subtract mean and divide by std.dev
+                scaling = 4 : log-transform, subtract mean and decorrelate
+'''
+
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,9 +35,9 @@ def example_1_simple_polynomial():
     print("="*70)
     
     np.random.seed(42)
-    nInp = 2   # 2 input variables
-    nOut = 1   # 1 output variable
-    mData = 150  # 150 data points
+    nInp = 2     # 2  input variables
+    nOut = 1     # 1 output variable
+    mData = 500  # number of data points
     
     # Generate input data
     dataX = 2 * np.random.randn(nInp, mData)
@@ -35,12 +48,12 @@ def example_1_simple_polynomial():
                    2.0 * dataX[0, :] + 
                    0.5 * dataX[1, :] ** 2 + 
                    0.3 * dataX[0, :] * dataX[1, :] + 
-                   0.1 * np.random.randn(mData))
+                   0.0 * np.random.randn(mData))
     
     # Fit model
     print("\nFitting model...")
     order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY = \
-        mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=70, pCull=40, 
+        mimoSHORSA(dataX, dataY, maxOrder=4, pTrain=70, pCull=40, 
                    tol=0.20, scaling=1)
     
     print("\n" + "-"*70)
@@ -203,6 +216,7 @@ def visualize_model_performance(testY, testModelY):
     """
     nOut = testY.shape[0]
     
+    plt.ion() # interactive mode: on 
     fig, axes = plt.subplots(1, nOut, figsize=(6*nOut, 5))
     if nOut == 1:
         axes = [axes]
@@ -216,8 +230,8 @@ def visualize_model_performance(testY, testModelY):
         # Perfect prediction line
         min_val = min(np.min(testY[io, :]), np.min(testModelY[io, :]))
         max_val = max(np.max(testY[io, :]), np.max(testModelY[io, :]))
-        ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, 
-                label='Perfect prediction')
+        ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2) 
+        #       label='Perfect prediction')
         
         # Correlation
         corr = np.corrcoef(testY[io, :], testModelY[io, :])[0, 1]
@@ -244,10 +258,11 @@ def main():
     
     # Run examples
     print("\n\nRunning examples (this may take a few minutes)...\n")
-    
+
     # Example 1
     order1, coeff1, testModelY1, testX1, testY1 = example_1_simple_polynomial()
     
+    '''
     # Example 2
     order2, coeff2, testModelY2, testX2, testY2 = example_2_multi_output()
     
@@ -256,13 +271,15 @@ def main():
     
     # Example 4
     example_4_with_scaling()
+    '''
     
-    # Visualize one example
+    # Visualize one of the examples 
     print("\n" + "="*70)
-    print("Creating visualization for Example 2...")
+    print("Creating visualization for Example 1...")
     print("="*70)
-    visualize_model_performance(testY2, testModelY2)
+    visualize_model_performance(testY1, testModelY1)
     
+    '''
     print("\n" + "#"*70)
     print("# All examples completed successfully!")
     print("#"*70)
@@ -272,8 +289,8 @@ def main():
     print("  3. Scaling is important for numerical stability")
     print("  4. The method works for single and multiple outputs")
     print("  5. Higher dimensions require careful choice of maxOrder")
+    '''
     
-    plt.show()
 
 
 if __name__ == '__main__':

@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from time import time
-
+import matplotlib.cm as cm
+import time as time
+from datetime import datetime, timedelta
 
 def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=1):
     '''
@@ -99,7 +100,7 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         print(f'{np.min(trainZx):.6f} < trainZx < {np.max(trainZx):.6f}')
         print(f'{np.min(trainZy):.6f} < trainZy < {np.max(trainZy):.6f}')
     
-    # Note: pause(3) removed - can add time.sleep(3) if needed for debugging
+    time.sleep(1) # if needed for debugging
     
     # separate order for each variable --- Not needed if data is already provided
     # [maxOrder, orderR2] = polynomial_orders(maxOrder)
@@ -119,7 +120,7 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
     coeffCOVmax = np.full((nOut, maxCull), np.nan)
     
     # start a timer to measure computational time
-    start_time = time()
+    start_time = time.time()
     
     for iter in range(maxCull):  # cull uncertain terms from the model ------------
         
@@ -148,6 +149,7 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         
         print_model_stats(iter, coeff, order, coeffCOV, testMDcorr[:, iter], R2adj, scaling, maxCull)
         
+        plt.ion() # interactive mode: on
         for io in range(nOut):
             plt.figure(400 + io)
             format_plot(18, 4, 8)
@@ -163,7 +165,7 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
                      f'ρ_test = {testMDcorr[io, iter]:.3f}, cond(B) = {condB[io, iter]:.1f}')
         
         plt.draw()
-        plt.pause(0.001)
+        plt.pause(1.001)
         
         if (testMDcorr[:, iter] > 0).all() and (np.max(coeffCOVmax[:, iter]) < tol):
             maxCull = iter + 1
@@ -298,7 +300,7 @@ def polynomial_orders(maxOrder, Zx, Zy, n, tol, scaling):
             ttl = f'k_{{{i+1}}}={ki}   R^2 = {orderR2[i]:.3f}   fit-error = {fit_error:.3f}'
             plt.legend()
             plt.title(ttl)
-            plt.pause(0.1)
+            plt.pause(1.1)
             
             if (orderR2[i] > 1 - tol) and (fit_error < tol):  # the 1D fit is accurate
                 break
@@ -924,8 +926,7 @@ def print_model_stats(iter, coeff, order, coeffCOV, MDcorr, R2adj, scaling, maxC
         print(f'  model-data correlation {io + 1}  = {MDcorr[io]:6.3f}')
     
     # Estimate time remaining
-    import time
-    from datetime import datetime, timedelta
+    # import time
     
     # Calculate estimated time remaining
     # Note: In Python, we'd need to track elapsed time separately
@@ -998,9 +999,8 @@ def rainbow(n):
     '''
     
     # Use matplotlib's rainbow/jet colormap
-    from matplotlib import cm
     cmap = cm.get_cmap('rainbow', n)
-    colors = np.array([cmap(i)[:3] for i in range(n)])  # Get RGB, exclude alpha
+    colors = np.array([cmap(i)[:3] for i in range(n)]) # Get RGB, exclude alpha
     
     return colors
 
