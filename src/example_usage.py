@@ -21,7 +21,6 @@ This script demonstrates:
                 scaling = 4 : log-transform, subtract mean and decorrelate
 '''
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 from mimoSHORSA import mimoSHORSA
@@ -48,13 +47,13 @@ def example_1_simple_polynomial():
                    2.0 * dataX[0, :] + 
                    0.5 * dataX[1, :] ** 2 + 
                    0.3 * dataX[0, :] * dataX[1, :] + 
-                   0.0 * np.random.randn(mData))
+                   0.2 * np.random.randn(mData))
     
     # Fit model
     print("\nFitting model...")
     order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY = \
-        mimoSHORSA(dataX, dataY, maxOrder=4, pTrain=70, pCull=40, 
-                   tol=0.20, scaling=1)
+        mimoSHORSA(dataX, dataY, maxOrder=5, pTrain=70, pCull=40, 
+                   tol=0.10, scaling=1)
     
     print("\n" + "-"*70)
     print("Final Model Summary:")
@@ -291,7 +290,6 @@ def main():
     print("  5. Higher dimensions require careful choice of maxOrder")
     '''
     
-
 
 if __name__ == '__main__':
     main()

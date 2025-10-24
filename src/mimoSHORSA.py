@@ -141,8 +141,8 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         testModelY, _ = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, testX, scaling)
         
         # evaluate the model for the training data and the testing data
-        trainMDcorr[:, iter], coeffCOV, _, _ = evaluate_model(B, coeff, trainY, trainModelY, trainFigNo)
-        testMDcorr[:, iter], _, R2adj, AIC = evaluate_model(B, coeff, testY, testModelY, testFigNo)
+        trainMDcorr[:, iter], coeffCOV, _, _ = evaluate_model(B, coeff, trainY, trainModelY, trainFigNo, 'train')
+        testMDcorr[:, iter], _, R2adj, AIC = evaluate_model(B, coeff, testY, testModelY, testFigNo, 'test')
         
         for io in range(nOut):
             coeffCOVmax[io, iter] = np.max(coeffCOV[io])
@@ -790,7 +790,7 @@ def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling):
     return modelY, B
 
 
-def evaluate_model(B, coeff, dataY, modelY, figNo):
+def evaluate_model(B, coeff, dataY, modelY, figNo, txt):
     '''
     [ MDcorr, coeffCOV , R2adj, AIC ] = evaluate_model( B, coeff, dataY, modelY, figNo )
     evaluate the model statistics 
@@ -802,6 +802,7 @@ def evaluate_model(B, coeff, dataY, modelY, figNo):
      dataY      output (dependent) data                               nOut x mData
      modelY     model predictions                                     nOut x mData
      figNo      figure number for plotting (figNo = 0: don't plot)         1 x 1
+       txt      annotation text
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
@@ -869,6 +870,9 @@ def evaluate_model(B, coeff, dataY, modelY, figNo):
             ty = 0.4 - 0.1 * io
             plt.text(tx * ax[1] + (1 - tx) * ax[0], ty * ax[3] + (1 - ty) * ax[2],
                     f'ρ_{{x,y{io}}} = {MDcorr[io]:.3f}', color=cMap[io, :])
+            ty = 0.4 + 0.0 * io
+            plt.text(tx * ax[1] + (1 - tx) * ax[0], ty * ax[3] + (1 - ty) * ax[2],
+                    f'txt', color=cMap[io, :])
         
         plt.show(block=False)
     

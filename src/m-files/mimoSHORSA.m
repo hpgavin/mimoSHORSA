@@ -83,8 +83,8 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 
   % scale data matrices trainX and trainY separately since using 
   % tne covariance between trainX and trainY in the model is "cheating"
-  [trainZx , meanX , trfrmX] = scale_data(trainX, scaling, 0 );
-  [trainZy , meanY , trfrmY] = scale_data(trainY, scaling, 0 );
+  [trainZx , meanX , trfrmX] = scale_data( trainX, scaling );
+  [trainZy , meanY , trfrmY] = scale_data( trainY, scaling );
 
   if ( scaling > 0 ) % remove each column of trainZx and trainZy with outliers
     XY  = [ trainZx ; trainZy ];
@@ -141,8 +141,10 @@ pause(3)
     [ testModelY, ~] = compute_model(order,coeff, meanX,meanY,trfrmX,trfrmY,  testX,scaling);
 
     % evaluate the model for the training data and the testing data
-    [trainMDcorr(:,iter), coeffCOV, ~, ~ ] = evaluate_model(B,coeff, trainY, trainModelY, trainFigNo);
-    [ testMDcorr(:,iter), ~, R2adj,  AIC ] = evaluate_model(B,coeff,  testY,  testModelY,  testFigNo);
+    [trainMDcorr(:,iter), coeffCOV, ~, ~ ] = evaluate_model(B,coeff, trainY, trainModelY, trainFigNo, 'test');
+    [ testMDcorr(:,iter), ~, R2adj,  AIC ] = evaluate_model(B,coeff,  testY,  testModelY,  testFigNo, 'train');
+
+    pause(1);
 
     for io = 1:nOut
       coeffCOVmax(io,iter) = max(coeffCOV{io});
@@ -718,8 +720,8 @@ function  [ modelY, B ] = compute_model(order, coeff, meanX,meanY,trfrmX,trfrmY,
 end % ================================================== function compute_model
 
 
-function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataY, modelY, figNo )
-% [ MDcorr, coeffCOV , R2adj] = evaluate_model( B, coeff, dataY, modelY, figNo )
+function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataY, modelY, figNo, txt )
+% [ MDcorr, coeffCOV , R2adj] = evaluate_model( B, coeff, dataY, modelY, figNo, txt )
 % evaluate the model statistics 
 %
 % INPUT       DESCRIPTION                                           DIMENSION
@@ -729,6 +731,7 @@ function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataY, model
 %  dataX      input  (explanatory) data                               nInp x mData
 %  dataY      output  (dependent)) data                               nOut x mData
 %  figNo      figure number for plotting (figNo = 0: don't plot)         1 x 1
+%  txt        text annotation 
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
 % --------    ---------------------------------------------------   ---------
@@ -793,6 +796,8 @@ function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataY, model
         ty = 0.4-0.1*io;
         text(tx*ax(2) + (1-tx)*ax(1), ty*ax(4) + (1-ty)*ax(3), ...
              sprintf('\\rho_{x,y%d} = %5.3f', io, MDcorr(io) ) , 'color', cMap(io,:) );
+        ty = 0.4+0.0*io;
+        text(tx*ax(2) + (1-tx)*ax(1), ty*ax(4) + (1-ty)*ax(3), sprintf('%s', txt ));
       end
   end
 
