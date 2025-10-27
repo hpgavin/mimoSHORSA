@@ -1,5 +1,5 @@
-function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] = mimoSHORSA ( dataX,dataY, maxOrder, pTrain,pCull, tol, scaling )
-% [ order, coeff, trfrmX,trfrmY, meanX,meanY, testModelY, testX,testY ] = mimoSHORSA( dataX,dataY, maxOrder, pTrain,pCull, tol, scaling )
+function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] = mimoSHORSA ( dataX,dataY, max_order, pTrain,pCull, tol, scaling, L1_coeff, basis_fctn )
+% [ order, coeff, trfrmX,trfrmY, meanX,meanY, testModelY, testX,testY ] = mimoSHORSA( dataX,dataY, max_order, pTrain,pCull, tol, scaling, L1_coeff, basis_fctn )
 %
 % mimoSHORSA
 % multi-input multi-output Stochastic High Order Response Surface Algorithm
@@ -20,7 +20,7 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 % --------    --------------------------------------------------------   -------
 % dataX       m observations of n input  features in a (nx x m) matrix
 % dataY       m observations of m output features in a (ny x m) matrix
-% maxOrder    maximum allowable polynomial order                            3
+% max_order    maximum allowable polynomial order                            3
 % pTrain      percentage of data for training (remaining for testing)      50
 % pCull       maximum percentage of model which may be culled              30 
 % tol         desired maximum model coefficient of variation                0.10
@@ -30,6 +30,8 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 %             scaling = 2 : subtract mean and decorrelate
 %             scaling = 3 : log-transform, subtract mean and divide by std.dev
 %             scaling = 4 : log-transform, subtract mean and decorrelate
+% L1_coeff    coefficient for L_1 regularization        
+% basis_fctn  'H': Hermite fctn, 'L': Legendre polynomial, 'P': power polynomial
 %
 % OUTPUT      DESCRIPTION
 % --------    --------------------------------------------------------
@@ -57,11 +59,14 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
   fprintf('\n Multi-Input Multi-Output High Order Response Surface (mimoSHORSA)\n\n');
 
   if nargin < 2 , help mimoHOSRS; return; end
-  if nargin < 3 , maxOrder = 3;     else maxOrder = round(abs(maxOrder)); end
-  if nargin < 4 , pTrain   = 0.50;  else pTrain   = abs(pTrain)/100;      end
-  if nargin < 5 , pCull    = 0.30;  else pCull    = abs(pCull)/100;       end
-  if nargin < 6 , tol      = 0.10;  else tol      = abs(tol);             end
-  if nargin < 7 , scaling  = 0;     else scaling  = round(abs(scaling));  end
+  if nargin < 3 , max_order = 3;   else max_order = round(abs(max_order)); end
+  if nargin < 4 , pTrain   = 0.5; else pTrain   = abs(pTrain)/100;      end
+  if nargin < 5 , pCull    = 0.3; else pCull    = abs(pCull)/100;       end
+  if nargin < 6 , tol      = 0.1; else tol      = abs(tol);             end
+  if nargin < 7 , scaling  = 0;   else scaling  = round(abs(scaling));  end
+  if nargin < 8 , L1_coeff = 0;   else L1_coeff = abs(L1_coeff);        end
+
+  if L1_coeff > 0 , pCull = 0; end    % no "culling" with L_1 regularization
 
 
   [nInp, mDataX] = size(dataX);   % number of columns in dataX is mData
@@ -99,17 +104,17 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 
   end
 
-pause(3)
+% pause(3)
 
 % separate order for each variable --- Not needed if data is already provided
-% [maxOrder, orderR2] = polynomial_orders(maxOrder);
+% [max_order, orderR2] = polynomial_orders(max_order);
 
-  maxOrder = maxOrder*ones(1,nInp);   % same maximum order for all variables
+  max_order = max_order*ones(1,nInp);   % same maximum order for all variables
  
-  [ order, nTerm ] = mixed_term_powers( maxOrder, nInp, nOut ); 
+  [ order, nTerm ] = mixed_term_powers( max_order, nInp, nOut ); 
 
 % initialize variables
-  maxCull = round(pCull*nTerm(1));  % maximum number of terms to cull
+  maxCull = max(1,round(pCull*nTerm(1)));  % maximum number of terms to cull
   condB   = NaN(nOut,maxCull); % condition number of basis as model is culled
   for io = 1:nOut
     coeffCOV{io} = ones(1,nTerm(1));
@@ -133,16 +138,16 @@ pause(3)
 
     % fit ("train") a separate model for each output (dependent) variable
     for io = 1:nOut
-      [ coeff{io} , condB(io,iter) ] = fit_model( trainZx, trainZy(io,:), order{io}, nTerm(io), mTrain );
+      [ coeff{io} , condB(io,iter) ] = fit_model( trainZx, trainZy(io,:), order{io}, nTerm(io), mTrain, L1_coeff, basis_fctn );
     end
 
     % compute the model for the training data and the testing data
-    [trainModelY, B] = compute_model(order,coeff, meanX,meanY,trfrmX,trfrmY, trainX,scaling);
-    [ testModelY, ~] = compute_model(order,coeff, meanX,meanY,trfrmX,trfrmY,  testX,scaling);
+    [trainModelY, B] = compute_model(order,coeff, meanX,meanY,trfrmX,trfrmY, trainX,scaling, basis_fctn);
+    [ testModelY, ~] = compute_model(order,coeff, meanX,meanY,trfrmX,trfrmY,  testX,scaling, basis_fctn);
 
     % evaluate the model for the training data and the testing data
-    [trainMDcorr(:,iter), coeffCOV, ~, ~ ] = evaluate_model(B,coeff, trainY, trainModelY, trainFigNo, 'test');
-    [ testMDcorr(:,iter), ~, R2adj,  AIC ] = evaluate_model(B,coeff,  testY,  testModelY,  testFigNo, 'train');
+    [trainMDcorr(:,iter), coeffCOV, ~, ~ ] = evaluate_model(B,coeff, trainX, trainY, trainModelY, trainFigNo, 'test');
+    [ testMDcorr(:,iter), ~, R2adj,  AIC ] = evaluate_model(B,coeff,  testX,  testY,  testModelY,  testFigNo, 'train');
 
     pause(1);
 
@@ -164,8 +169,7 @@ pause(3)
           end
         ylabel('coefficient of variation')
         xlabel('term number')
-        title(sprintf('Y_%d, \\rho_{train} = %5.3f, \\rho_{test} = %5.3f, cond(B) = %5.1f', ...
-               io, trainMDcorr(io,iter), testMDcorr(io,iter), condB(io,iter) ));
+        title(sprintf('Y_%d, \\rho_{train} = %5.3f, \\rho_{test} = %5.3f, cond(B) = %5.1f', io, trainMDcorr(io,iter), testMDcorr(io,iter), condB(io,iter) ));
     end 
     drawnow
 
@@ -174,8 +178,9 @@ pause(3)
       break
     end
 
-    [order, nTerm, coeffCOV] = cull_model( coeff, order, coeffCOV, tol ); 
-
+    if L1_coeff == 0
+      [order, nTerm, coeffCOV] = cull_model( coeff, order, coeffCOV, tol ); 
+    end
 
   end                    % ------------ cull uncertain terms from the model
 
@@ -247,14 +252,14 @@ function [trainX,trainY,mTrain, testX,testY,mTest] = split_data(dataX,dataY,pTra
 end % ===================================================== function split_data
 
 
-function [order, orderR2] = polynomial_orders(maxOrder) 
-% [order, orderR2] = polynomial_orders(maxOrder) 
+function [order, orderR2] = polynomial_orders(max_order) 
+% [order, orderR2] = polynomial_orders(max_order) 
   fprintf('1st Stage: Polynomial Order Determination ...\n');
 
   order    = ones(1,n);     % initial guess of response surface orders
   quality  = zeros(1,n); 
   orderR2  = zeros(1,n);
-  no_pts   = maxOrder+15;   % number of sample points (must be > ki+1)
+  no_pts   = max_order+15;   % number of sample points (must be > ki+1)
 
   % sample points along dimension X_i within the domain [-1,1]
   % (roots of no_pts-th order Chevbyshev polynomial)
@@ -276,7 +281,7 @@ function [order, orderR2] = polynomial_orders(maxOrder)
   % interpolate the data at the Chebyshev sampling points
     y = IDWinterp( Zx', Zy', zMap', 2, 10, 0.1 );
 
-    for ki = order(i) : maxOrder   % loop over possible polynomial orders
+    for ki = order(i) : max_order   % loop over possible polynomial orders
                                
   % values of 0-th to ki-th degree Chevbyshev polynomials at
   % the sampling points.
@@ -449,14 +454,14 @@ function scatter_data(Data,S,figNo)
 end % =================================================== function scatter_data
 
 
-function [ order , nTerm ] = mixed_term_powers( maxOrder, nInp, nOut )
-% [ order , nTerm ] = mixed_term_powers( maxOrder, nInp, nOut )
+function [ order , nTerm ] = mixed_term_powers( max_order, nInp, nOut )
+% [ order , nTerm ] = mixed_term_powers( max_order, nInp, nOut )
 % specify the exponents on each input variable for every term in the model,
 % and the total number of terms, nTerm
 %
 % INPUT       DESCRIPTION                                           DIMENSION
 % --------    ---------------------------------------------------   ---------
-% maxOrder    maximum polynomial order of the model                   1 x 1
+% max_order    maximum polynomial order of the model                   1 x 1
 % nInp        number of input  (explanatory) variables                1 x 1
 % nOut        number of output  (dependent)  variables                1 x 1
 %
@@ -478,7 +483,7 @@ function [ order , nTerm ] = mixed_term_powers( maxOrder, nInp, nOut )
 
   fprintf('Determine the Mixed Term Power Products ...\n');
 
-  nTerm = prod(maxOrder+1);
+  nTerm = prod(max_order+1);
 
   ordr = zeros(nTerm,nInp);         % allocate memory for the 'order' matrix
   term = zeros(1,nInp);              % orders in a given term
@@ -487,7 +492,7 @@ function [ order , nTerm ] = mixed_term_powers( maxOrder, nInp, nOut )
   for t = 1:nTerm                    % loop over all terms
     term(1) = term(1)+1;             % increment order of the first variable
     for v = 1:nInp                   % check every column in the row
-      if term(v) > maxOrder(v)
+      if term(v) > max_order(v)
          term(v) = 0;
          term(v+1) = term(v+1)+1;    % increment columns as needed
       end
@@ -502,7 +507,7 @@ function [ order , nTerm ] = mixed_term_powers( maxOrder, nInp, nOut )
   % Remove the terms in which the total order is larger than 
   % the highest order term.  
 
-  [it, ~, ~ ] = find( sum(ordr,2) <= max(maxOrder) );
+  [it, ~, ~ ] = find( sum(ordr,2) <= max(max_order) );
   ordr = ordr( it , : );
 
   % The number of rows is in the matrix 'order' is the number of
@@ -515,95 +520,161 @@ function [ order , nTerm ] = mixed_term_powers( maxOrder, nInp, nOut )
   end
  
   fprintf('  Total Number of Terms: %3d\n', nTerm(1));
-  fprintf('  Number of Mixed Terms: %3d\n\n', nTerm(1)-sum(maxOrder)-1);
+  fprintf('  Number of Mixed Terms: %3d\n\n', nTerm(1)-sum(max_order)-1);
 
 end % ============================================= function mixed_term_powers
 
 
-function psyProduct = hermite_product( order, Zx )
-% psyProduct = hermite_product( order, Zx )
-% compute the product of hermite functions of given orders (from 0 to 5)
+function psyProduct = polynomial_product( order, Zx, N, basis_fctn )
+% psyProduct = polynomial_product( order, Zx, N, basis_fctn )
+% compute the product of polynomials of given orders (from 0 to 5)
 % for a set of column vectors Z, where each column of Zx has a given order
 %
 % INPUT       DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-% order       vector model orders of powers present in one term
-%             of the polynoimial model                               1 x nInp
-%  Zx         matrix of scaled input (explanatory) variables      nInp x mData
+% --------    ---------------------------------------------------  -----------
+%  order      vector of powers present in one term of the model      1 x nInp
+%    Zx       matrix of scaled input (explanatory) variables      nInp x mData
+%    N        largest order in the full expansion                    1 x 1
+% basis_fctn  'H': Hermite fctn, 'L': Legendre polynomial, 'P': power polynomial
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-% psyProduct  vector of product of hermite polynomials               1 x mData 
+% --------    ---------------------------------------------------  -----------
+% psyProduct  vector of product of polynomials               1 x mData 
  
   nInp = length(order);            % number of input (explanatory) variables
   psyProduct = ones(size(Zx,1),1); % initialze to vector of 1
 
-  for k = 1:nInp
-    psyProduct = psyProduct .* hermite( order(k), Zx(:,k) );
+  switch basis_fctn
+  case 'L' % Legendre 
+    for k = 1:nInp
+      psyProduct = psyProduct .* legendre( order(k), Zx(:,k) );
+    end
+  case 'H' % Hermite
+    for k = 1:nInp
+      psyProduct = psyProduct .* hermite( order(k), Zx(:,k), N );
+    end
   end
 
 end % ================================================= function hermite_product
 
 
-function psy = hermite(order,z)
-% psy = hermite(order,z)
-% compute the Hermite function of a given order (orders from 0 to 10)
+function psy = hermite(order,z,N)
+% psy = hermite(order,z,n,N)
+% compute the shifted Hermite function of a given order (orders from 0 to 10)
 % for a vector of values of z 
 % https://en.wikipedia.org/wiki/Hermite_polynomials#Hermite_functions
+% Note: These Hermite functions are index-shifted by 2, in order to 
+% augment the basis with a constant (0-order) function and a linear (1-order) 
+% function.  The 0-order and 1-order functions have approximately unit-area and 
+% attenuate exponentially at rates comparable to the highest order Hermite 
+% function in the basis.  
 %
 % INPUT       DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-% order       the polynoimial order of a hermite function            1 x 1
-% Zx          vector of input (explanatory) variables                1 x mData  
+% --------    ---------------------------------------------------  -----------
+%  order      the polynoimial order of a Hermite function            1 x 1
+%     z       vector of input (explanatory) variables                1 x mData  
+%     N       largest order in the full expansion                    1 x 1
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-%  psy        a hermite function of specified order at given values  1 x mData
+% --------    ---------------------------------------------------  -----------
+%  psy        a Hermite function of specified order at given values  1 x mData
  
   pi4 = pi^(0.25);
   ez2 = exp(-0.5*z.^2);
+
+  n = 3*N;     % exponent in the the exponent term for order (0) and order (1)
+  N = N+2;     % expand the domain of extrapolation 
  
   switch order
     case  0
-      psy = 1/pi4 * ez2;
+      psy =    exp(-(z/N).^(2*n)) / (2*N);
     case  1
-      psy = sqrt(2)/pi4 * z .* ez2;
+      psy = z.*exp(-(z/N).^(2*n)) / (0.25*N^2 *(0.5/n)^(0.5/n));
     case  2
-      psy = 1/(sqrt(2)*pi4) * (2*z.^2 - 1) .* ez2;
+      psy = 1/pi4 * ez2;
     case  3
-      psy = 1/(sqrt(3)*pi4) * (2*z.^3 - 3*z) .* ez2;
+      psy = sqrt(2)/pi4 * z .* ez2;
     case  4
-      psy = 1/(2*sqrt(6)*pi4) * (4*z.^4 - 12*z.^2 + 3) .* ez2;
+      psy = 1/(sqrt(2)*pi4) * (2*z.^2 - 1) .* ez2;
     case  5
-      psy = 1/(2*sqrt(15)*pi4) * (4*z.^5 - 20*z.^2 + 15*z) .* ez2;
+      psy = 1/(sqrt(3)*pi4) * (2*z.^3 - 3*z) .* ez2;
     case  6
-      psy = 1/(12*sqrt(5)*pi4) * (8*z.^6 - 60*z.^4 + 90*z.^2 - 15) .* ez2;
+      psy = 1/(2*sqrt(6)*pi4) * (4*z.^4 - 12*z.^2 + 3) .* ez2;
     case  7
-      psy = 1/(6*sqrt(70)*pi4) * (8*z.^7 - 84*z.^5 + 210*z.^3 - 105*z) .* ez2;
+      psy = 1/(2*sqrt(15)*pi4) * (4*z.^5 - 20*z.^2 + 15*z) .* ez2;
     case  8
-      psy = 1/(24*sqrt(70)*pi4) * (16*z.^8 - 224*z.^6 + 840*z.^4 - 840*z.^2 + 105) .* ez2;
+      psy = 1/(12*sqrt(5)*pi4) * (8*z.^6 - 60*z.^4 + 90*z.^2 - 15) .* ez2;
     case  9
+      psy = 1/(6*sqrt(70)*pi4) * (8*z.^7 - 84*z.^5 + 210*z.^3 - 105*z) .* ez2;
+    case  10 
+      psy = 1/(24*sqrt(70)*pi4) * (16*z.^8 - 224*z.^6 + 840*z.^4 - 840*z.^2 + 105) .* ez2;
+    case  11 
       psy = 1/(72*sqrt(35)*pi4) * (16*z.^9 - 288*z.^7 + 1512*z.^5 - 2520^z.^3 + 945*z) .* ez2;
-    case 10
+    case  12
       psy = 1/(720*sqrt(7)*pi4) * (32*z.^10 - 720*z.^8 + 5040*z.^6 - 12600*z.^4 + 9450*z.^2 - 945) .* ez2;
   end
 
 end % ======================================================= function hermite
 
 
-function B = build_basis( Zx, order); 
-% B = build_basis( Zx, order); 
+function psy = legendre(order,z)
+% psy = legendre(order,z)
+% compute the Legendre function of a given order (orders from 0 to 10)
+% for a vector of values of z 
+% https://en.wikipedia.org/wiki/Legendre_polynomials#Rodrigues'_formula_and_other_explicit_formulas
+%
+% INPUT       DESCRIPTION                                           DIMENSION
+% --------    ---------------------------------------------------  -----------
+%  order      the polynoimial order of a Legendre function           1 x 1
+%     z       vector of input (explanatory) variables                1 x mData  
+%
+% OUTPUT      DESCRIPTION                                           DIMENSION
+% --------    ---------------------------------------------------  -----------
+%  psy        a Hermite function of specified order at given values  1 x mData
+ 
+
+  switch order
+    case  0
+      psy = ones(length(z),1); 
+    case  1
+      psy = z;
+    case  2
+      psy = (    3*z.^2 -     1  )/2;
+    case  3
+      psy = (    5*z.^3 -     3*z)/2;
+    case  4
+      psy = (   35*z.^4 -    30*z.^2 +    3  )/8;
+    case  5
+      psy = (   63*z.^5 -    70*z.^3 +   15*z)/8;
+    case  6
+      psy = (  231*z.^6 -   315*z.^4 +  105*z.^2 -    5  )/16;
+    case  7
+      psy = (  429*z.^7 -   693*z.^5 +  315*z.^3 -   35*z)/16;
+    case  8
+      psy = ( 6435*z.^8 - 12012*z.^6 + 6930*z.^4 - 1260*z.^2+  35   )/128;
+    case  9
+      psy = (12155*z.^9 - 25740*z.^7 +18018*z.^5 - 4620*z.^3+ 315*z )/128;
+    case  10 
+      psy = (46189*z.^10-109395*z.^8 +90090*z.^6 -30030*z.^4+3465.*z.^2-63)/256;
+  end
+
+end % ======================================================= function hermite
+
+
+function B = build_basis( Zx, order, basis_fctn ) 
+% B = build_basis( Zx, order, basis_fctn ) 
 % compute matrix of model basis vectors
 % options: power-polynomial basis  or  Hermite function basis
 %
 % INPUT       DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-%  Zx         matrix of input (explanatory) variables              nInp x mData
-% order       powers for each variable on each term of the model  nTerm x nInp
+% --------    ---------------------------------------------------  -----------
+%  Zx         matrix of input (explanatory) variables             nInp x mData
+% order       powers for each variable on each term of the model nTerm x nInp
+% basis_fctn  'H': Hermite fctn, 'L': Legendre polynomial, 'P': power polynomial
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-%   B         matrix basis vectors for the polynomial model       mData x nTerm
+% --------    ---------------------------------------------------  -----------
+%   B         matrix basis vectors for the polynomial model      mData x nTerm
 
   mData = size(Zx,2);            % number of data points
   [ nTerm, nInp ] = size(order); % number of terms, inputs, outputs 
@@ -612,57 +683,85 @@ function B = build_basis( Zx, order);
   % in the matrix of basis vectors, B, 
   % columns correspond to each term in the polynomial and 
   % rows correspond to each observation 
- 
-  for it = 1:nTerm
-    % use either power polynomials or Hermite functions ...
-    % ... power polynomials ...
-%   B(:,it) =  prod( Zx'.^(ones(mData,1)*order(it,:)) , 2);
-    % ... Hermite functions ...
-    B(:,it) =  hermite_product( order(it,:), Zx' );
+
+  max_order = max(max(order)); 
+
+  switch basis_fctn % select basis functions 
+    case 'P' % ... power polynomials ...
+      for it = 1:nTerm
+        B(:,it) = prod( Zx'.^(ones(mData,1)*order(it,:)) , 2);
+      end
+    otherwise % Legendre or Hermite ... maybe Tschebitshiew also
+      for it = 1:nTerm
+        B(:,it) = polynomial_product( order(it,:), Zx', max_order, basis_fctn );
+      end
   end
  
 end % ==================================================== function build_basis
 
 
-function [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData )
+function [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_coeff, basis_fctn )
 % [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData )
 % Fit the polynomial model to the data using 
 % the ordinary least squares method or singular value decomposition
 %
 % INPUT       DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
+% --------    ---------------------------------------------------  -----------
 %  Zx         scaled input (explanatory) data                         nx x mData
-%  Zy         scaled input (explanatory) data                         ny x mData
+%  Zy         scaled input (explanatory) data                          1 x mData
 %  order      powers on each explantory variabe for each term      nTerm x nx
 %  nTerm      number of terms in the polynomial model                  1 x 1
+%  L1_coeff   L_1 regularization coefficient                           1 x 1 
+% basis_fctn  'H': Hermite fctn, 'L': Legendre polynomial, 'P': power polynomial
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
+% --------    ---------------------------------------------------  -----------
 %  coeff      vector of model coefficients                           nTerm x 1  
 %  condB      condition number of the model basis                     nOut x 1
 
-  fprintf('Fit The Model ...\n');
+  fprintf('Fit The Model ... with L1_coeff = %f \n', L1_coeff );
 
   nOut = size(order,3);              % number of output (dependent) variables
 
-  B = build_basis( Zx, order ); 
+  B = build_basis( Zx, order, basis_fctn ); 
+
+  nTerms = size(B,2)
+
+% plot the basis (for nInp == 2) 
+  for ii = 1:nTerms
+    figure(1000+ii)
+    clf
+    hold on
+    plot3(Zx(1,:), Zx(2,:),B(:,ii),'o')
+    xlabel('X_1')
+    ylabel('X_2')
+    zlabel(sprintf('B_{%d}',ii-1))
+    title(sprintf('B_{%d}',ii-1))
+  end
  
+  coeff = zeros(nTerm,nOut);
   % determine the coefficients of the response surface for each output
-  % C = (X'*X)\(X'*Zy)    % ... by the ordinary least squares method
-  coeff = B \ Zy';        % ... by singular value decomposition
-  condB = cond(B);        % condition number
+
+  if L1_coeff > 0             % ... by QP optimization for L1 regularization
+    [ coeff, mu, nu, cvg_hst ] = L1_fit( B, Zy', L1_coeff );
+  else 
+    coeff = B \ Zy';          % ... by singular value decomposition
+  % coeff = (B'*B)\(B'*Zy)    % ... by the ordinary least squares method
+  end
+
+  condB = cond(B)         % condition number
 
   fprintf('  condition number of model basis matrix = %6.1f \n', condB );
 
 end % ====================================================== function fit_model
 
  
-function  [ modelY, B ] = compute_model(order, coeff, meanX,meanY,trfrmX,trfrmY,dataX,scaling)
+function  [ modelY, B ] = compute_model(order, coeff, meanX,meanY,trfrmX,trfrmY,dataX,scaling, basis_fctn)
 % [ modelY, B ] = compute_model(order, coeff, meanX,meanY,trfrmX,trfrmY,dataX,scaling)
 % compute a multivariate power-polynomial model 
 %
 % INPUT       DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
+% --------    ---------------------------------------------------  -----------
 %  order      powers on each explantory variabe for each term      nTerm x nx
 %  coeff      model coefficient vector                             nTerm x 1  
 %  meanX      mean of pre-scaled input  (explanatory) variables     nInp x 1 
@@ -670,9 +769,10 @@ function  [ modelY, B ] = compute_model(order, coeff, meanX,meanY,trfrmX,trfrmY,
 %  trfrmX     transformation matrix for input variables             nInp x nInp 
 %  trfrmY     transformation matrix for input variables             nOut x nOut
 %  scaling    scaling type ... see scale_data function                 1 x 1
+% basis_fctn  'H': Hermite fctn, 'L': Legendre polynomial, 'P': power polynomial
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
+% --------    ---------------------------------------------------  -----------
 % modelY      computed model                                        nOut x mData
 %  B          basis vector matrix of the computed model            mData x nTerm  
 
@@ -697,7 +797,7 @@ function  [ modelY, B ] = compute_model(order, coeff, meanX,meanY,trfrmX,trfrmY,
 
   for io = 1:nOut
 
-    B{io} = build_basis( dataZx, order{io} ); 
+    B{io} = build_basis( dataZx, order{io}, basis_fctn ); 
 
     modelZy(:,io) = B{io} * coeff{io};
 
@@ -720,26 +820,26 @@ function  [ modelY, B ] = compute_model(order, coeff, meanX,meanY,trfrmX,trfrmY,
 end % ================================================== function compute_model
 
 
-function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataY, modelY, figNo, txt )
-% [ MDcorr, coeffCOV , R2adj] = evaluate_model( B, coeff, dataY, modelY, figNo, txt )
+function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataX, dataY, modelY, figNo, txt )
+% [ MDcorr, coeffCOV , R2adj] = evaluate_model( B, coeff, dataX, dataY, modelY, figNo, txt )
 % evaluate the model statistics 
 %
-% INPUT       DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-%  B          cell array of basis vector matrices of the each model {mData x nTerm}
-%  coeff      cell array of coefficent vectors of each model        {nTerm x 1}  
-%  dataX      input  (explanatory) data                               nInp x mData
-%  dataY      output  (dependent)) data                               nOut x mData
-%  figNo      figure number for plotting (figNo = 0: don't plot)         1 x 1
+% OUTPUT      DESCRIPTION                                           DIMENSION
+% --------    ---------------------------------------------------  -----------
+%  B          cell array of basis vector matrices of each model  {mData x nTerm}
+%  coeff      cell array of coefficent vectors of each model     {nTerm x 1}  
+%  dataX      input  (explanatory) data                            nInp x mData
+%  dataY      output  (dependent)) data                            nOut x mData
+%  figNo      figure number for plotting (figNo = 0: don't plot)      1 x 1
 %  txt        text annotation 
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-% MDcorr      model-data correlation                                1 x nOut
+% --------    ---------------------------------------------------  -----------
+% MDcorr      model-data correlation                                  1 x nOut
 % coeffCOV    cell array of coefficient of variation of
-%             each model coefficent of each model                 { 1 x nTerm }
-% R2adj       adjusted R-squared for each model                     1 x nOut
-% AIC         Akaike information criterion for each model           1 x nOut
+%             each model coefficent of each model                    {1 x nTerm}
+% R2adj       adjusted R-squared for each model                       1 x nOut
+% AIC         Akaike information criterion for each model             1 x nOut
 
   [ nOut, mData ] = size(dataY);
   MDcorr = NaN(nOut,1);
@@ -801,27 +901,27 @@ function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataY, model
       end
   end
 
-end % ===================================================== function evaluate_model
+end % ================================================ function evaluate_model
  
 
 function [ order, nTerm, coeffCOV ] = cull_model( coeff, order, coeffCOV, tol )
 % [ order, nTerm, coeffCOV ] = cull_model( c, order, coeffCOV, tol )
 % remove the term from the model that has the largest coeffCOV
 %
-% INPUT       DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-%  coeff      cell array of coefficent vectors of each model        {nTerm x 1}  
-%  order      powers on each explantory variabe for each term       {nTerm x nInp}
+%  INPUT      DESCRIPTION                                           DIMENSION
+% --------    ---------------------------------------------------  -----------
+%  coeff      cell array of coefficent vectors of each model     {nTerm x 1}  
+%  order      powers on each explantory variabe for each term    {nTerm x nInp}
 % coeffCOV    cell array of coefficient of variation of
-%             each model coefficent of each model                       {1 x nTerm}
-%  tol        tolerance for an acceptable coeffCOV                       1 x 1
+%             each model coefficent of each model                    {1 x nTerm}
+%  tol        tolerance for an acceptable coeffCOV                    1 x 1
 %
-% OUTPUT      DESCRIPTION                                           DIMENSION
-% --------    ---------------------------------------------------   ---------
-%  order      retrained powers on each explantory variabe for each term  {nTerm x nInp}
-%  nTerm      number of terms in each polynomial model                  1 x nOut
+% OUNPUT      DESCRIPTION                                           DIMENSION
+% --------    ---------------------------------------------------  -----------
+%  order      retrained powers on each explantory variabe for each term {nTerm x nInp}
+%  nTerm      number of terms in each polynomial model                1 x nOut
 % coeffCOV    cell array of coefficient of variation of
-%             each model coefficent of each culled model               {1 x nTerm}
+%             each model coefficent of each culled model             {1 x nTerm}
  
    nOut = length(order); 
 

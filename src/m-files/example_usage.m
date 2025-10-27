@@ -9,6 +9,7 @@
 %
 % This MATLAB script mirrors example_usage.py for cross-validation
 
+
 function example_usage()
 % Run all examples
 
@@ -62,25 +63,45 @@ function [order, coeff, testModelY, testX, testY] = example_1_simple_polynomial(
   
   nInp = 2;    % 2 input variables
   nOut = 1;    % 1 output variable
-  mData = 550; % 150 data points
+  mData = 950; % 150 data points
   
   % Generate input data
   dataX = 2 * randn(nInp, mData);
   
   % Generate output: y = 1 + 2*x1 + 0.5*x2^2 + 0.3*x1*x2 + noise
   dataY = zeros(nOut, mData);
-  dataY(1, :) = 1.0 + ...
-                2.0 * dataX(1, :) + ...
-                0.5 * dataX(2, :) .^ 2 + ...
-                0.3 * dataX(1, :) .* dataX(2, :) + ...
-                0.2 * randn(1, mData);
+  dataY(1, :) = 0.0 + ...
+                0.3 * dataX(1, :) + ...
+                0.5 * dataX(1, :) .^ 2 + ...
+               -0.3 * dataX(2, :) + ...
+               -0.2 * dataX(2, :) .^ 2 + ...
+                0.5 * dataX(1, :) .* dataX(2, :) + ...
+                0.10 * randn(1, mData);
   
   % Fit model
   fprintf('\nFitting model...\n');
   [order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY] = ...
-      mimoSHORSA(dataX, dataY, 5, 70, 40, 0.10, 1);
-  %             maxOrder=4, pTrain=70, pCull=40, tol=0.10, scaling=1
+      mimoSHORSA(dataX, dataY, 3, 70, 40, 0.10, 2, 0.20, 'P');
+  %      maxOrder=3, 
+  %        pTrain=70, 
+  %         pCull=40, 
+  %           tol=0.10, 
+  %       scaling=2, 
+  %      L1_coeff=0.20
+  %    basis_fctn='P'
   
+% plot the model (for nInp == 2) 
+  for ii = 1:nOut
+    figure(2000+ii)
+    clf
+    hold on
+    plot3(testX(1,:), testX(2,:),  testY(ii,:),'ok')
+    plot3(testX(1,:), testX(2,:), testModelY(ii,:),'og')
+    xlabel('X_1')
+    ylabel('X_2')
+    zlabel('Y')
+  end
+
   fprintf('\n');
   fprintf('----------------------------------------------------------------------\n');
   fprintf('Final Model Summary:\n');
@@ -97,7 +118,7 @@ function [order, coeff, testModelY, testX, testY] = example_1_simple_polynomial(
             sprintf('%d ', order{1}(idx, :)), coeff{1}(idx));
   end
 
-end % ============================================= function example_1_simple_polynomial
+end % =================================== function example_1_simple_polynomial
 
 
 function [order, coeff, testModelY, testX, testY] = example_2_multi_output()
@@ -237,9 +258,9 @@ function example_4_with_scaling()
 % Example 4: Demonstrate different scaling options
 
   fprintf('\n');
-  fprintf('======================================================================\n');
+  fprintf('================================================================\n');
   fprintf('Example 4: Scaling Options Comparison\n');
-  fprintf('======================================================================\n');
+  fprintf('================================================================\n');
   
   rand('seed', 789);
   randn('seed', 789);
@@ -276,7 +297,7 @@ function example_4_with_scaling()
     end
   end
 
-end % ============================================== function example_4_with_scaling
+end % ======================================== function example_4_with_scaling
 
 
 function visualize_model_performance(testY, testModelY)
@@ -305,7 +326,7 @@ function visualize_model_performance(testY, testModelY)
     xlabel('Model Prediction', 'FontSize', 12);
     ylabel('True Value', 'FontSize', 12);
     title(sprintf('Output %d: \\rho = %.3f', io, corr_val), 'FontSize', 14);
-    legend('Data', 'Perfect prediction', 'Location', 'best');
+    legend('Data', 'Perfect prediction', 'Location', 'NorthWest');
     grid on;
     axis equal;
     hold off;
