@@ -1,5 +1,5 @@
-function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] = mimoSHORSA ( dataX,dataY, max_order, pTrain,pCull, tol, scaling, L1_coeff, basis_fctn )
-% [ order, coeff, trfrmX,trfrmY, meanX,meanY, testModelY, testX,testY ] = mimoSHORSA( dataX,dataY, max_order, pTrain,pCull, tol, scaling, L1_coeff, basis_fctn )
+function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] = mimoSHORSA ( dataX,dataY, max_order, pTrain,pCull, tol, scaling, L1_pnlty, basis_fctn )
+% [ order, coeff, trfrmX,trfrmY, meanX,meanY, testModelY, testX,testY ] = mimoSHORSA( dataX,dataY, max_order, pTrain,pCull, tol, scaling, L1_pnlty, basis_fctn )
 %
 % mimoSHORSA
 % multi-input multi-output Stochastic High Order Response Surface Algorithm
@@ -30,7 +30,7 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 %             scaling = 2 : subtract mean and decorrelate
 %             scaling = 3 : log-transform, subtract mean and divide by std.dev
 %             scaling = 4 : log-transform, subtract mean and decorrelate
-% L1_coeff    coefficient for L_1 regularization        
+% L1_pnlty    coefficient for L_1 regularization        
 % basis_fctn  'H': Hermite fctn, 'L': Legendre polynomial, 'P': power polynomial
 %
 % OUTPUT      DESCRIPTION
@@ -60,13 +60,13 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 
   if nargin < 2 , help mimoHOSRS; return; end
   if nargin < 3 , max_order = 3;   else max_order = round(abs(max_order)); end
-  if nargin < 4 , pTrain   = 0.5; else pTrain   = abs(pTrain)/100;      end
-  if nargin < 5 , pCull    = 0.3; else pCull    = abs(pCull)/100;       end
-  if nargin < 6 , tol      = 0.1; else tol      = abs(tol);             end
-  if nargin < 7 , scaling  = 0;   else scaling  = round(abs(scaling));  end
-  if nargin < 8 , L1_coeff = 0;   else L1_coeff = abs(L1_coeff);        end
+  if nargin < 4 , pTrain   = 0.5; else pTrain   = abs(pTrain)/100;     end
+  if nargin < 5 , pCull    = 0.3; else pCull    = abs(pCull)/100;      end
+  if nargin < 6 , tol      = 0.1; else tol      = abs(tol);            end
+  if nargin < 7 , scaling  = 0;   else scaling  = round(abs(scaling)); end
+  if nargin < 8 , L1_pnlty = 1;   else L1_pnlty = abs(L1_pnlty);       end
 
-  if L1_coeff > 0 , pCull = 0; end    % no "culling" with L_1 regularization
+  if L1_pnlty > 0 , pCull = 0; end    % no "culling" with L_1 regularization
 
 
   [nInp, mDataX] = size(dataX);   % number of columns in dataX is mData
@@ -138,7 +138,7 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
 
     % fit ("train") a separate model for each output (dependent) variable
     for io = 1:nOut
-      [ coeff{io} , condB(io,iter) ] = fit_model( trainZx, trainZy(io,:), order{io}, nTerm(io), mTrain, L1_coeff, basis_fctn );
+      [ coeff{io} , condB(io,iter) ] = fit_model( trainZx, trainZy(io,:), order{io}, nTerm(io), mTrain, L1_pnlty, basis_fctn );
     end
 
     % compute the model for the training data and the testing data
@@ -178,7 +178,7 @@ function [ order, coeff, meanX,meanY, trfrmX,trfrmY,  testModelY, testX,testY ] 
       break
     end
 
-    if L1_coeff == 0
+    if L1_pnlty == 0
       [order, nTerm, coeffCOV] = cull_model( coeff, order, coeffCOV, tol ); 
     end
 
@@ -700,7 +700,7 @@ function B = build_basis( Zx, order, basis_fctn )
 end % ==================================================== function build_basis
 
 
-function [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_coeff, basis_fctn )
+function [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn )
 % [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData )
 % Fit the polynomial model to the data using 
 % the ordinary least squares method or singular value decomposition
@@ -711,7 +711,7 @@ function [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_coeff, b
 %  Zy         scaled input (explanatory) data                          1 x mData
 %  order      powers on each explantory variabe for each term      nTerm x nx
 %  nTerm      number of terms in the polynomial model                  1 x 1
-%  L1_coeff   L_1 regularization coefficient                           1 x 1 
+%  L1_pnlty   L_1 regularization coefficient                           1 x 1 
 % basis_fctn  'H': Hermite fctn, 'L': Legendre polynomial, 'P': power polynomial
 %
 % OUTPUT      DESCRIPTION                                           DIMENSION
@@ -719,7 +719,7 @@ function [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_coeff, b
 %  coeff      vector of model coefficients                           nTerm x 1  
 %  condB      condition number of the model basis                     nOut x 1
 
-  fprintf('Fit The Model ... with L1_coeff = %f \n', L1_coeff );
+  fprintf('Fit The Model ... with L1_pnlty = %f \n', L1_pnlty );
 
   nOut = size(order,3);              % number of output (dependent) variables
 
@@ -742,11 +742,12 @@ function [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_coeff, b
   coeff = zeros(nTerm,nOut);
   % determine the coefficients of the response surface for each output
 
-  if L1_coeff > 0             % ... by QP optimization for L1 regularization
-    [ coeff, mu, nu, cvg_hst ] = L1_fit( B, Zy', L1_coeff );
+  if L1_pnlty > 0             % ... by QP optimization for L1 regularization
+    [ coeff, mu, nu, cvg_hst ] = L1_fit( B, Zy', L1_pnlty, 0 );
+    L1_plots( B, coeff, Zy', cvg_hst, L1_pnlty, 0, 7000 );
   else 
     coeff = B \ Zy';          % ... by singular value decomposition
-  % coeff = (B'*B)\(B'*Zy)    % ... by the ordinary least squares method
+  % coeff = inv(B'*B)*(B'*Zy) % ... by the ordinary least squares method
   end
 
   condB = cond(B)         % condition number
@@ -867,6 +868,7 @@ function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataX, dataY
  
     % coefficient of variation of each coefficient for model "io"
     coeffCOV{io} = abs( Std_Err_Coeff ./ coeff{io} );
+    coeffCOV{io}(find(abs(coeff{io})<1e-6)) = 1e-3; 
 
     AIC(io) = 0;   % add AIC here
 

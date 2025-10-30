@@ -30,10 +30,6 @@ function example_usage()
 % example_4_with_scaling();
   
   % Visualize one example
-  fprintf('\n');
-  fprintf('======================================================================\n');
-  fprintf('Creating visualization for Example 1...\n');
-  fprintf('======================================================================\n');
   visualize_model_performance(testY1, testModelY1);
   
 % fprintf('\n');
@@ -71,25 +67,25 @@ function [order, coeff, testModelY, testX, testY] = example_1_simple_polynomial(
   % Generate output: y = 1 + 2*x1 + 0.5*x2^2 + 0.3*x1*x2 + noise
   dataY = zeros(nOut, mData);
   dataY(1, :) = 0.0 + ...
-                0.3 * dataX(1, :) + ...
+                0.5 * dataX(1, :) + ...
                 0.5 * dataX(1, :) .^ 2 + ...
-               -0.3 * dataX(2, :) + ...
-               -0.2 * dataX(2, :) .^ 2 + ...
-                0.5 * dataX(1, :) .* dataX(2, :) + ...
-                0.10 * randn(1, mData);
+               -0.5 * dataX(2, :) + ...
+               -0.5 * dataX(2, :) .^ 2 + ...
+                2.0 * dataX(1, :) .* dataX(2, :) + ...
+                2.00 * randn(1, mData);
   
   % Fit model
   fprintf('\nFitting model...\n');
   [order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY] = ...
-      mimoSHORSA(dataX, dataY, 3, 70, 40, 0.10, 2, 0.20, 'P');
+      mimoSHORSA(dataX, dataY, 2, 70, 40, 0.10, 2, 5e1, 'L');
   %      maxOrder=3, 
   %        pTrain=70, 
   %         pCull=40, 
   %           tol=0.10, 
   %       scaling=2, 
-  %      L1_coeff=0.20
+  %      L1_pnlty=50
   %    basis_fctn='P'
-  
+
 % plot the model (for nInp == 2) 
   for ii = 1:nOut
     figure(2000+ii)
@@ -102,6 +98,7 @@ function [order, coeff, testModelY, testX, testY] = example_1_simple_polynomial(
     zlabel('Y')
   end
 
+%{
   fprintf('\n');
   fprintf('----------------------------------------------------------------------\n');
   fprintf('Final Model Summary:\n');
@@ -117,6 +114,7 @@ function [order, coeff, testModelY, testX, testY] = example_1_simple_polynomial(
     fprintf('  Term %d: powers=[%s], coeff=%8.4f\n', idx, ...
             sprintf('%d ', order{1}(idx, :)), coeff{1}(idx));
   end
+%}
 
 end % =================================== function example_1_simple_polynomial
 
