@@ -582,14 +582,13 @@ function psy = hermite(order,z,N)
   pi4 = pi^(0.25);
   ez2 = exp(-0.5*z.^2);
 
-  n = 3*N;     % exponent in the the exponent term for order (0) and order (1)
   N = N+2;     % expand the domain of extrapolation 
  
   switch order
     case  0
-      psy =    exp(-(z/N).^(2*n)) / (2*N);
+      psy =    exp(-(z/N).^(6*N));
     case  1
-      psy = z.*exp(-(z/N).^(2*n)) / (0.25*N^2 *(0.5/n)^(0.5/n));
+      psy = z.*exp(-(z/N).^(6*N)) / N;
     case  2
       psy = 1/pi4 * ez2;
     case  3
