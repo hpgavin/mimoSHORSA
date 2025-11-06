@@ -57,7 +57,7 @@ def example_1_simple_polynomial():
                    pTrain=70,     # 70% training, 30% testing
                    pCull=40,      # Will be set to 0 if L1_pnlty > 0
                    tol=0.10,      # Maximum coefficient of variation
-                   scaling=2,     # Decorrelation scaling
+                   scaling=1,     # Decorrelation scaling
                    L1_pnlty=50,   # L1 regularization penalty
                    basis_fctn='L') # 'H'=Hermite, 'L'=Legendre, 'P'=Power
     

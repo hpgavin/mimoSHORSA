@@ -3,14 +3,17 @@
 ## 📦 Patch Files Delivered
 
 1. **[mimoSHORSA_updates.patch](computer:///mnt/user-data/outputs/mimoSHORSA_updates.patch)**
+   
    - Main mimoSHORSA.py updates
    - 13 changes + 1 new function (Legendre)
 
 2. **[mimoSHORSA_example_updates.patch](computer:///mnt/user-data/outputs/mimoSHORSA_example_updates.patch)**
+   
    - Example/test file updates
    - New examples demonstrating L1 and basis options
 
 3. **[MIMOSHORSA_UPDATE_PLAN.md](computer:///mnt/user-data/outputs/MIMOSHORSA_UPDATE_PLAN.md)**
+   
    - Detailed implementation plan
 
 ---
@@ -18,12 +21,14 @@
 ## 🎯 How to Apply the Patches
 
 ### Step 1: Backup Your Files
+
 ```bash
 cp mimoSHORSA.py mimoSHORSA.py.backup
 cp example_usage.py example_usage.py.backup
 ```
 
 ### Step 2: Open Patch Files
+
 ```bash
 # View the patches
 cat mimoSHORSA_updates.patch
@@ -33,6 +38,7 @@ cat mimoSHORSA_example_updates.patch
 ### Step 3: Apply Changes Manually
 
 For each "CHANGE N" in the patch file:
+
 1. Find the "OLD CODE" in your file
 2. Replace with "NEW CODE"
 3. For "INSERT" sections, add the new code at the specified location
@@ -45,7 +51,7 @@ Add this function after the `hermite()` function in mimoSHORSA.py:
 def legendre(n, z):
     '''Legendre polynomial of order n'''
     z = np.asarray(z)
-    
+
     if n == 0:
         return np.ones_like(z)
     elif n == 1:
@@ -53,12 +59,12 @@ def legendre(n, z):
     else:
         P_nm1 = np.ones_like(z)
         P_n = z
-        
+
         for k in range(1, n):
             P_np1 = ((2*k + 1) * z * P_n - k * P_nm1) / (k + 1)
             P_nm1 = P_n
             P_n = P_np1
-        
+
         return P_n
 ```
 
@@ -84,6 +90,7 @@ After applying patches:
 ## 🧪 Testing
 
 ### Test 1: Backward Compatibility (Traditional COV Culling)
+
 ```python
 # Should work exactly like before
 order, coeff, *rest = mimoSHORSA(
@@ -99,6 +106,7 @@ order, coeff, *rest = mimoSHORSA(
 ```
 
 ### Test 2: L1 Regularization
+
 ```python
 # New feature: L1 regularization (no culling)
 order, coeff, *rest = mimoSHORSA(
@@ -114,6 +122,7 @@ order, coeff, *rest = mimoSHORSA(
 ```
 
 ### Test 3: Power Polynomial Basis
+
 ```python
 # For polynomial data
 order, coeff, *rest = mimoSHORSA(
@@ -137,12 +146,14 @@ order, coeff, *rest = mimoSHORSA(
 **Default**: 1.0
 
 **Values**:
+
 - `0`: Disable L1, use traditional COV culling
 - `0.1 - 10`: Light regularization (gentle sparsity)
 - `10 - 100`: Medium regularization (moderate sparsity)
 - `100+`: Strong regularization (high sparsity)
 
 **Guidelines**:
+
 - Start with `L1_pnlty = 10`
 - Increase if model has too many terms
 - Decrease if test correlation drops significantly
@@ -153,22 +164,27 @@ order, coeff, *rest = mimoSHORSA(
 **Default**: 'H' (Hermite)
 
 **Options**:
+
 - **'H'**: Hermite functions
+  
   - Good for: General use, reliability analysis
   - Properties: Orthogonal, exp(-z²/2) decay
   - Best with: Standardized data
 
 - **'L'**: Legendre polynomials
+  
   - Good for: Polynomial data, bounded domains
   - Properties: Orthogonal on [-1,1], no decay
   - Best with: Decorrelated data
 
 - **'P'**: Power polynomials
+  
   - Good for: Known polynomial models
   - Properties: Exact polynomial representation
   - Best with: Any scaling, ideal for validation
 
 **Recommendation**:
+
 - For new problems: Start with 'L' (Legendre)
 - For polynomial validation: Use 'P' (Power)
 - For original mimoSHORSA: Use 'H' (Hermite)
@@ -178,6 +194,7 @@ order, coeff, *rest = mimoSHORSA(
 ## 🔍 Troubleshooting
 
 ### Import Error: L1_fit not found
+
 ```python
 # Make sure L1_fit.py is in your PYTHONPATH
 import sys
@@ -187,14 +204,18 @@ sys.path.append('/path/to/L1_fit')
 ```
 
 ### Results Different from MATLAB
+
 Check:
+
 1. Random seed set the same? (`np.random.seed(42)`)
 2. Same basis function? ('H', 'L', or 'P')
 3. Same L1_pnlty value?
 4. Same scaling option?
 
 ### Too Many/Few Terms with L1
+
 Adjust `L1_pnlty`:
+
 - Too many terms → Increase L1_pnlty
 - Too few terms → Decrease L1_pnlty
 - Try values: 1, 5, 10, 20, 50, 100
@@ -203,13 +224,13 @@ Adjust `L1_pnlty`:
 
 ## 📊 Expected Behavior Changes
 
-| Scenario | Old Behavior | New Behavior |
-|----------|--------------|--------------|
-| L1_pnlty=0 | COV culling | COV culling (same) |
-| L1_pnlty>0 | N/A | L1 regularization, no culling |
-| basis_fctn='H' | Always Hermite | Hermite (same) |
-| basis_fctn='L' | N/A | Legendre polynomials |
-| basis_fctn='P' | N/A | Power polynomials |
+| Scenario       | Old Behavior   | New Behavior                  |
+| -------------- | -------------- | ----------------------------- |
+| L1_pnlty=0     | COV culling    | COV culling (same)            |
+| L1_pnlty>0     | N/A            | L1 regularization, no culling |
+| basis_fctn='H' | Always Hermite | Hermite (same)                |
+| basis_fctn='L' | N/A            | Legendre polynomials          |
+| basis_fctn='P' | N/A            | Power polynomials             |
 
 ---
 
@@ -232,6 +253,7 @@ Adjust `L1_pnlty`:
 ## 🎉 Summary
 
 **What Changed**:
+
 - ✅ Added L1 regularization support
 - ✅ Added Legendre polynomial basis
 - ✅ Added Power polynomial basis

@@ -119,8 +119,8 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
     order, nTerm = mixed_term_powers(maxOrder, nInp, nOut)
     
     # initialize variables
-    maxCull = int(round(pCull * nTerm[0]))  # maximum number of terms to cull
-    condB = np.full((nOut, maxCull), np.nan)  # condition number of basis as model is culled
+    maxCull = max(1,int(round(pCull * nTerm[0]))) # maximum number of terms to cull
+    condB = np.full((nOut, maxCull), np.nan) # condition number of basis as model is culled
     for io in range(nOut):
         coeffCOV[io] = np.ones(nTerm[0])
     
@@ -147,7 +147,9 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         
         # compute the model for the training data and the testing data
         trainModelY, B = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, trainX, scaling, basis_fctn)
-        testModelY, _ = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, testX, scaling, basis_fctn)
+        testModelY, _  = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, testX, scaling, basis_fctn)
+
+        print("..a\n") 
 
         
         # evaluate the model for the training data and the testing data
@@ -184,7 +186,6 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         if L1_pnlty == 0:
             order, nTerm, coeffCOV = cull_model(coeff, order, coeffCOV, tol)
 
-    
     # ------------ cull uncertain terms from the model
     
     # plot correlations and coefficients of variation
@@ -676,7 +677,7 @@ def build_basis(Zx, order, basis_fctn='H'):
    
 def hermite(n, z, N):
     '''
-    psy = hermite(n, z)
+    psy = hermite(n, z, N)
     compute the Hermite function of a given order (orders from 0 to 10)
     for a vector of values of z 
     https://en.wikipedia.org/wiki/Hermite_polynomials#Hermite_functions
@@ -737,13 +738,10 @@ def hermite(n, z, N):
 def legendre(n, z):
     '''
     Compute Legendre polynomial of order n evaluated at points z
+    Legendre polynomials are orthogonal on [-1, 1]:
+    integral_{-1}^{1} P_m(z) P_n(z) dz = 2/(2n+1) * δ_{mn}
 
-    Uses recurrence relation:
-    P_0(z) = 1
-    P_1(z) = z
-    P_{n+1}(z) = ((2n+1)*z*P_n(z) - n*P_{n-1}(z)) / (n+1)
-
-    Parameters
+   Parameters
     ----------
     n : int
         Order of Legendre polynomial
@@ -754,18 +752,6 @@ def legendre(n, z):
     -------
     P_n : ndarray
         Legendre polynomial P_n(z)
-
-    Examples
-    --------
-    >>> z = np.linspace(-1, 1, 100)
-    >>> P0 = legendre(0, z)  # Returns ones
-    >>> P1 = legendre(1, z)  # Returns z
-    >>> P2 = legendre(2, z)  # Returns (3*z^2 - 1)/2
-
-    Notes
-    -----
-    Legendre polynomials are orthogonal on [-1, 1]:
-    integral_{-1}^{1} P_m(z) P_n(z) dz = 2/(2n+1) * δ_{mn}
     '''
 
     z = np.asarray(z)
@@ -774,39 +760,28 @@ def legendre(n, z):
         return np.ones_like(z)
     elif n == 1:
         return z
-    elif n == 2
+    elif n == 2:
       psy = (    3*z**2 -     1  )/2;
-    elif n == 3
+    elif n == 3:
       psy = (    5*z**3 -     3*z)/2;
-    elif n == 4
+    elif n == 4:
       psy = (   35*z**4 -    30*z**2 +    3  )/8;
-    elif n == 5
+    elif n == 5:
       psy = (   63*z**5 -    70*z**3 +   15*z)/8;
-    elif n == 6
+    elif n == 6:
       psy = (  231*z**6 -   315*z**4 +  105*z**2 -    5  )/16;
-    elif n == 7
+    elif n == 7:
       psy = (  429*z**7 -   693*z**5 +  315*z**3 -   35*z)/16;
-    elif n == 8
+    elif n == 8:
       psy = ( 6435*z**8 - 12012*z**6 + 6930*z**4 - 1260*z**2+  35   )/128;
-    elif n == 9
+    elif n == 9:
       psy = (12155*z**9 - 25740*z**7 +18018*z**5 - 4620*z**3+ 315*z )/128;
-    elif n == 10 
+    elif n == 10:
       psy = (46189*z**10-109395*z**8 +90090*z**6 -30030*z**4+3465.*z**2-63)/256;
     else:
         raise ValueError(f'Legendre function implemented only for orders 0-10, got order={order}')
 
-
-    else:
-        # Use recurrence relation for n >= 2
-        P_nm1 = np.ones_like(z)   # P_0(z)
-        P_n = z                   # P_1(z)
-
-        for k in range(1, n):
-            P_np1 = ((2*k + 1) * z * P_n - k * P_nm1) / (k + 1)
-            P_nm1 = P_n
-            P_n = P_np1
-
-        return P_n
+    return psy
 
 
 def fit_model(Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn):
