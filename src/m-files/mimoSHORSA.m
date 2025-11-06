@@ -558,8 +558,8 @@ function psyProduct = polynomial_product( order, Zx, N, basis_fctn )
 end % ================================================= function hermite_product
 
 
-function psy = hermite(order,z,N)
-% psy = hermite(order,z,n,N)
+function psy = hermite(n,z,N)
+% psy = hermite(n,z,N)
 % compute the shifted Hermite function of a given order (orders from 0 to 10)
 % for a vector of values of z 
 % https://en.wikipedia.org/wiki/Hermite_polynomials#Hermite_functions
@@ -571,7 +571,7 @@ function psy = hermite(order,z,N)
 %
 % INPUT       DESCRIPTION                                           DIMENSION
 % --------    ---------------------------------------------------  -----------
-%  order      the polynoimial order of a Hermite function            1 x 1
+%     n       the polynoimial order of a Hermite function            1 x 1
 %     z       vector of input (explanatory) variables                1 x mData  
 %     N       largest order in the full expansion                    1 x 1
 %
@@ -584,11 +584,11 @@ function psy = hermite(order,z,N)
 
   N = N+2;     % expand the domain of extrapolation 
  
-  switch order
+  switch n 
     case  0
-      psy =    exp(-(z/N).^(6*N));
+      psy =          exp(-(z/N).^(6*N));
     case  1
-      psy = z.*exp(-(z/N).^(6*N)) / N;
+      psy = (z/N) .* exp(-(z/N).^(6*N));
     case  2
       psy = 1/pi4 * ez2;
     case  3
@@ -617,7 +617,7 @@ end % ======================================================= function hermite
 
 
 function psy = legendre(order,z)
-% psy = legendre(order,z)
+% psy = legendre(order,z,N)
 % compute the Legendre function of a given order (orders from 0 to 10)
 % for a vector of values of z 
 % https://en.wikipedia.org/wiki/Legendre_polynomials#Rodrigues'_formula_and_other_explicit_formulas
@@ -1011,5 +1011,5 @@ end % ============================================= function print_model_stats
   fprintf('  model-data correlation = %6.3f \n', MDcorr(1,2)); 
 %}
 
-% updated 2006-01-29, 2007-02-21, 2007-03-06, 2009-10-14, 2022-11-19 2023-02-27, 2023-05-31 2025-01-28
+% updated 2006-01-29, 2007-02-21, 2007-03-06, 2009-10-14, 2022-11-19 2023-02-27, 2023-05-31, 2025-11-06
 

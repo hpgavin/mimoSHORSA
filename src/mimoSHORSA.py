@@ -4,7 +4,7 @@ import matplotlib.cm as cm
 import time as time
 from datetime import datetime, timedelta
 
-def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=1):
+def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=1, L1_pnlty=1.0, basis_fctn='H'):
     '''
     [ order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY ] = mimoSHORSA( dataX, dataY, maxOrder, pTrain, pCull, tol, scaling )
     
@@ -37,6 +37,12 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
                 scaling = 2 : subtract mean and decorrelate
                 scaling = 3 : log-transform, subtract mean and divide by std.dev
                 scaling = 4 : log-transform, subtract mean and decorrelate
+    L1_pnlty    coefficient for L1 regularization                             1.0
+    basis_fctn  basis function type                                            'H'
+                'H': Hermite functions
+                'L': Legendre polynomials
+                'P': Power polynomials
+
     
     OUTPUT      DESCRIPTION
     --------    --------------------------------------------------------
@@ -68,6 +74,9 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
     pCull = abs(pCull) / 100 if pCull > 1 else abs(pCull)
     tol = abs(tol)
     scaling = int(round(abs(scaling)))
+    L1_pnlty = abs(L1_pnlty)
+    if L1_pnlty > 0: # No "culling" with L1 regularization
+        pCull = 0
     
     nInp, mDataX = dataX.shape   # number of columns in dataX is mData
     nOut, mDataY = dataY.shape   # number of columns in dataY is mData
@@ -134,11 +143,12 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         
         # fit ("train") a separate model for each output (dependent) variable
         for io in range(nOut):
-            coeff[io], condB[io, iter] = fit_model(trainZx, trainZy[io, :], order[io], nTerm[io], mTrain)
+            coeff[io], condB[io, iter] = fit_model(trainZx, trainZy[io, :], order[io], nTerm[io], mTrain, L1_pnlty, basis_fctn)
         
         # compute the model for the training data and the testing data
-        trainModelY, B = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, trainX, scaling)
-        testModelY, _ = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, testX, scaling)
+        trainModelY, B = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, trainX, scaling, basis_fctn)
+        testModelY, _ = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, testX, scaling, basis_fctn)
+
         
         # evaluate the model for the training data and the testing data
         trainMDcorr[:, iter], coeffCOV, _, _ = evaluate_model(B, coeff, trainY, trainModelY, trainFigNo, 'train')
@@ -170,8 +180,10 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         if (testMDcorr[:, iter] > 0).all() and (np.max(coeffCOVmax[:, iter]) < tol):
             maxCull = iter + 1
             break
-        
-        order, nTerm, coeffCOV = cull_model(coeff, order, coeffCOV, tol)
+
+        if L1_pnlty == 0:
+            order, nTerm, coeffCOV = cull_model(coeff, order, coeffCOV, tol)
+
     
     # ------------ cull uncertain terms from the model
     
@@ -239,6 +251,7 @@ def split_data(dataX, dataY, pTrain):
     testY = dataY[:, idtestX]
     
     return trainX, trainY, mTrain, testX, testY, mTest
+
 
 def polynomial_orders(maxOrder, Zx, Zy, n, tol, scaling):
     '''
@@ -591,9 +604,9 @@ def mixed_term_powers(maxOrder, nInp, nOut):
     return order, nTerm
 
 
-def hermite_product(order, Zx):
+def polynomial_product(powers, Zx, max_order, basis_fctn='H'):
     '''
-    psyProduct = hermite_product( order, Zx )
+    psyProduct = polynomial_product( order, Zx, basis_fctn )
     compute the product of hermite functions of given orders (from 0 to 5)
     for a set of column vectors Z, where each column of Zx has a given order
     
@@ -602,6 +615,7 @@ def hermite_product(order, Zx):
     order       vector model orders of powers present in one term
                 of the polynomial model                               1 x nInp
      Zx         matrix of scaled input (explanatory) variables      mData x nInp
+     basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
@@ -610,58 +624,73 @@ def hermite_product(order, Zx):
     
     nInp = len(order)                # number of input (explanatory) variables
     psyProduct = np.ones(Zx.shape[0])  # initialize to vector of 1
-    
-    for k in range(nInp):
-        psyProduct = psyProduct * hermite(order[k], Zx[:, k])
+
+    for i in range(nInp):
+        if powers[i] > 0:
+            if basis_fctn == 'H':
+                result *= hermite(int(powers[i]), Zx[:, i])
+            elif basis_fctn == 'L':
+                result *= legendre(int(powers[i]), Zx[:, i], max_order)
     
     return psyProduct
 
 
-def build_basis(Zx, order):
+def build_basis(Zx, order, basis_fctn='H'):
     '''
-    B = build_basis( Zx, order )
+    B = build_basis( Zx, order, basis_fctn )
     compute matrix of model basis vectors
-    options: power-polynomial basis  or  Hermite function basis
-    
+    options: power-polynomial basis, Hermite function basis, or Legendre basis
+
     INPUT       DESCRIPTION                                           DIMENSION
-    --------    ---------------------------------------------------   ---------
-     Zx         matrix of input (explanatory) variables              nInp x mData
-    order       powers for each variable on each term of the model  nTerm x nInp
-    
+    --------    ---------------------------------------------------  -----------
+     Zx         matrix of input (explanatory) variables             nInp x mData
+     order      powers for each variable on each term of the model  nTerm x nInp
+     basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
+
     OUTPUT      DESCRIPTION                                           DIMENSION
-    --------    ---------------------------------------------------   ---------
+    --------    ---------------------------------------------------  -----------
       B         matrix basis vectors for the polynomial model       mData x nTerm
     '''
-    
-    mData = Zx.shape[1]              # number of data points
-    nTerm, nInp = order.shape        # number of terms, inputs, outputs 
-    B = np.ones((mData, nTerm))      # the matrix of model basis vectors 
-    
+
+    mData = Zx.shape[1]             # number of data points
+    nTerm, nInp = order.shape       # number of terms, inputs, outputs 
+    B = np.ones((mData, nTerm))     # the matrix of model basis vectors 
+
+    max_order = int(np.max(order))
+
     # in the matrix of basis vectors, B, 
     # columns correspond to each term in the polynomial and 
     # rows correspond to each observation 
-    
-    for it in range(nTerm):
-        # use either power polynomials or Hermite functions ...
-        # ... power polynomials ...
-        # B[:, it] = np.prod(Zx.T ** order[it, :], axis=1)
-        # ... Hermite functions ...
-        B[:, it] = hermite_product(order[it, :], Zx.T)
-    
+ 
+    if basis_fctn == 'P':
+        # Power polynomials
+        for it in range(nTerm):
+            B[:, it] = np.prod(Zx.T ** order[it, :], axis=1)
+    else:
+        # Legendre or Hermite
+        for it in range(nTerm):
+            B[:, it] = polynomial_product(order[it, :], Zx.T, max_order, basis_fctn)
+
     return B
 
-
-def hermite(order, z):
+   
+def hermite(n, z, N):
     '''
-    psy = hermite(order,z)
+    psy = hermite(n, z)
     compute the Hermite function of a given order (orders from 0 to 10)
     for a vector of values of z 
     https://en.wikipedia.org/wiki/Hermite_polynomials#Hermite_functions
+    Note: These Hermite functions are index-shifted by 2, in order to 
+    augment the basis with a constant (0-order) function and a linear (1-order) 
+    function.  The 0-order and 1-order functions have approximately unit-area and 
+    attenuate exponentially at rates comparable to the highest order Hermite 
+    function in the basis.  
     
     INPUT       DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-    order       the polynomial order of a hermite function            1 x 1
+    n           the polynomial order of a hermite function             1 x 1
     z           vector of input (explanatory) variables                1 x mData  
+    N           largest order in the full expansion                    1 x 1
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
@@ -670,40 +699,121 @@ def hermite(order, z):
     
     pi4 = np.pi**(0.25)
     ez2 = np.exp(-0.5 * z**2)
-    
-    if order == 0:
+
+    N = N+2;     # expand the domain of extrapolation 
+
+    if n == 0:
+        psy = exp(-(z/N)**(6*N))
+    elif n == 1:
+        psy = (z/N) * exp(-(z/N)**(6*N)) 
+    elif n == 2:
         psy = 1/pi4 * ez2
-    elif order == 1:
+    elif n == 3:
         psy = np.sqrt(2)/pi4 * z * ez2
-    elif order == 2:
+    elif n == 4:
         psy = 1/(np.sqrt(2)*pi4) * (2*z**2 - 1) * ez2
-    elif order == 3:
+    elif n == 5:
         psy = 1/(np.sqrt(3)*pi4) * (2*z**3 - 3*z) * ez2
-    elif order == 4:
+    elif n == 6:
         psy = 1/(2*np.sqrt(6)*pi4) * (4*z**4 - 12*z**2 + 3) * ez2
-    elif order == 5:
+    elif n == 7:
         psy = 1/(2*np.sqrt(15)*pi4) * (4*z**5 - 20*z**3 + 15*z) * ez2
-    elif order == 6:
+    elif n == 8:
         psy = 1/(12*np.sqrt(5)*pi4) * (8*z**6 - 60*z**4 + 90*z**2 - 15) * ez2
-    elif order == 7:
+    elif n == 9:
         psy = 1/(6*np.sqrt(70)*pi4) * (8*z**7 - 84*z**5 + 210*z**3 - 105*z) * ez2
-    elif order == 8:
+    elif n == 10:
         psy = 1/(24*np.sqrt(70)*pi4) * (16*z**8 - 224*z**6 + 840*z**4 - 840*z**2 + 105) * ez2
-    elif order == 9:
+    elif n == 11:
         psy = 1/(72*np.sqrt(35)*pi4) * (16*z**9 - 288*z**7 + 1512*z**5 - 2520*z**3 + 945*z) * ez2
-    elif order == 10:
+    elif n == 12:
         psy = 1/(720*np.sqrt(7)*pi4) * (32*z**10 - 720*z**8 + 5040*z**6 - 12600*z**4 + 9450*z**2 - 945) * ez2
     else:
-        raise ValueError(f'Hermite function only implemented for orders 0-10, got order={order}')
+        raise ValueError(f'Hermite function implemented only for orders 0-12, got order={order}')
     
     return psy
 
 
-def fit_model(trainZx, trainZy, order, nTerm, mTrain):
+def legendre(n, z):
     '''
-    [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData )
+    Compute Legendre polynomial of order n evaluated at points z
+
+    Uses recurrence relation:
+    P_0(z) = 1
+    P_1(z) = z
+    P_{n+1}(z) = ((2n+1)*z*P_n(z) - n*P_{n-1}(z)) / (n+1)
+
+    Parameters
+    ----------
+    n : int
+        Order of Legendre polynomial
+    z : array_like
+        Points at which to evaluate polynomial
+
+    Returns
+    -------
+    P_n : ndarray
+        Legendre polynomial P_n(z)
+
+    Examples
+    --------
+    >>> z = np.linspace(-1, 1, 100)
+    >>> P0 = legendre(0, z)  # Returns ones
+    >>> P1 = legendre(1, z)  # Returns z
+    >>> P2 = legendre(2, z)  # Returns (3*z^2 - 1)/2
+
+    Notes
+    -----
+    Legendre polynomials are orthogonal on [-1, 1]:
+    integral_{-1}^{1} P_m(z) P_n(z) dz = 2/(2n+1) * δ_{mn}
+    '''
+
+    z = np.asarray(z)
+
+    if n == 0:
+        return np.ones_like(z)
+    elif n == 1:
+        return z
+    elif n == 2
+      psy = (    3*z**2 -     1  )/2;
+    elif n == 3
+      psy = (    5*z**3 -     3*z)/2;
+    elif n == 4
+      psy = (   35*z**4 -    30*z**2 +    3  )/8;
+    elif n == 5
+      psy = (   63*z**5 -    70*z**3 +   15*z)/8;
+    elif n == 6
+      psy = (  231*z**6 -   315*z**4 +  105*z**2 -    5  )/16;
+    elif n == 7
+      psy = (  429*z**7 -   693*z**5 +  315*z**3 -   35*z)/16;
+    elif n == 8
+      psy = ( 6435*z**8 - 12012*z**6 + 6930*z**4 - 1260*z**2+  35   )/128;
+    elif n == 9
+      psy = (12155*z**9 - 25740*z**7 +18018*z**5 - 4620*z**3+ 315*z )/128;
+    elif n == 10 
+      psy = (46189*z**10-109395*z**8 +90090*z**6 -30030*z**4+3465.*z**2-63)/256;
+    else:
+        raise ValueError(f'Legendre function implemented only for orders 0-10, got order={order}')
+
+
+    else:
+        # Use recurrence relation for n >= 2
+        P_nm1 = np.ones_like(z)   # P_0(z)
+        P_n = z                   # P_1(z)
+
+        for k in range(1, n):
+            P_np1 = ((2*k + 1) * z * P_n - k * P_nm1) / (k + 1)
+            P_nm1 = P_n
+            P_n = P_np1
+
+        return P_n
+
+
+def fit_model(Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn):
+    '''
+    [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn )
     Fit the polynomial model to the data using 
-    the ordinary least squares method or singular value decomposition
+    ordinary least squares or L1 regularization
     
     INPUT       DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
@@ -712,6 +822,9 @@ def fit_model(trainZx, trainZy, order, nTerm, mTrain):
      order      powers on each explanatory variable for each term    nTerm x nx
      nTerm      number of terms in the polynomial model                  1 x 1
      mData      number of data points (not used, kept for compatibility) 1 x 1
+     L1_pnlty   L1 regularization coefficient                            1 x 1
+     basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
+
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
@@ -719,24 +832,43 @@ def fit_model(trainZx, trainZy, order, nTerm, mTrain):
      condB      condition number of the model basis                     1 x 1
     '''
     
-    print('Fit The Model ...')
-    
-    B = build_basis(trainZx, order)
-    
-    # determine the coefficients of the response surface for each output
-    # coeff = inv(B'*B) * (B'*Zy)    # ... by the ordinary least squares method
-    # coeff = B \ Zy'                # ... by singular value decomposition (MATLAB)
-    coeff = np.linalg.lstsq(B, trainZy.T, rcond=None)[0]  # ... by least squares (NumPy)
-    condB = np.linalg.cond(B)        # condition number
-    
+    print(f'Fit The Model ... with L1_pnlty = {L1_pnlty}')
+
+    if L1_pnlty > 0:
+        # Use L1_fit for regularization
+        try:
+            from L1_fit import L1_fit
+            from L1_plots import L1_plots
+
+            # Zy needs to be column vector for L1_fit
+            Zy_col = Zy.reshape(-1, 1) if Zy.ndim == 1 else Zy.reshape(-1, 1)
+
+            coeff, mu, nu, cvg_hst = L1_fit(B, Zy_col, L1_pnlty, w=0)
+
+            # Optional: plot L1 convergence
+            # L1_plots(B, coeff, Zy_col, cvg_hst, L1_pnlty, 0, fig_no=7000)
+
+        except ImportError:
+            print('WARNING: L1_fit not found, using OLS instead')
+            coeff = np.linalg.lstsq(B, Zy, rcond=None)[0]
+    else:
+        # Use ordinary least squares / SVD
+        coeff = np.linalg.lstsq(B, Zy, rcond=None)[0]
+
+    condB = np.linalg.cond(B)
+
+    print(f'  condition number of model basis matrix = {condB:6.1f}')
+
+    return coeff, condB
+
     print(f'  condition number of model basis matrix = {condB:6.1f}')
     
     return coeff, condB
 
 
-def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling):
+def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling, basis_fctn='H'):
     '''
-    [ modelY, B ] = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling)
+    [ modelY, B ] = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling,basis_fctn)
     compute a multivariate power-polynomial model 
     
     INPUT       DESCRIPTION                                           DIMENSION
@@ -749,6 +881,7 @@ def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling):
      trfrmY     transformation matrix for output variables            nOut x nOut
      dataX      input data to evaluate model on                       nInp x mData
      scaling    scaling type ... see scale_data function                 1 x 1
+     basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
@@ -774,7 +907,7 @@ def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling):
     
     # Compute model for each output
     for io in range(nOut):
-        B[io] = build_basis(dataZx, order[io])
+        B[io] = build_basis(dataZx, order[io], basis_fctn)
         modelZy[:, io] = B[io] @ coeff[io]
     
     # Inverse transform to original scale
@@ -1041,4 +1174,4 @@ def IDWinterp(Zx, Zy, zMap, p, k, tol):
     '''
     pass
 
-# updated 2006-01-29, 2007-02-21, 2007-03-06, 2009-10-14, 2022-11-19 2023-02-27, 2023-05-31 2025-01-28, 2025-10-23
+# updated 2006-01-29, 2007-02-21, 2007-03-06, 2009-10-14, 2022-11-19 2023-02-27, 2023-05-31 2025-11-06

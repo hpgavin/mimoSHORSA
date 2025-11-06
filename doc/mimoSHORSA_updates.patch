@@ -1,0 +1,398 @@
+================================================================================
+PATCH FILE: mimoSHORSA.py Updates for L1_fit and Basis Function Options
+================================================================================
+Date: 2025-11-06
+Purpose: Add L1 regularization and multiple basis function support
+
+Instructions:
+1. Find each "OLD CODE" section in your mimoSHORSA.py
+2. Replace with the corresponding "NEW CODE"
+3. Add any "INSERT NEW FUNCTION" sections where indicated
+
+================================================================================
+CHANGE 1: Main Function Signature
+Location: Line ~6
+================================================================================
+
+OLD CODE:
+def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=1):
+
+NEW CODE:
+def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=1, L1_pnlty=1.0, basis_fctn='H'):
+
+================================================================================
+CHANGE 2: Docstring Update
+Location: Line ~25-38
+================================================================================
+
+OLD CODE (in docstring):
+    scaling     scale the data before fitting                                 1
+                scaling = 0 : no scaling
+                scaling = 1 : subtract mean and divide by std.dev
+                scaling = 2 : subtract mean and decorrelate
+                scaling = 3 : log-transform, subtract mean and divide by std.dev
+                scaling = 4 : log-transform, subtract mean and decorrelate
+
+NEW CODE (in docstring):
+    scaling     scale the data before fitting                                 1
+                scaling = 0 : no scaling
+                scaling = 1 : subtract mean and divide by std.dev
+                scaling = 2 : subtract mean and decorrelate
+                scaling = 3 : log-transform, subtract mean and divide by std.dev
+                scaling = 4 : log-transform, subtract mean and decorrelate
+    L1_pnlty    coefficient for L1 regularization                             1.0
+    basis_fctn  basis function type                                            'H'
+                'H': Hermite functions
+                'L': Legendre polynomials  
+                'P': Power polynomials
+
+================================================================================
+CHANGE 3: Add L1 Logic After Parameter Processing
+Location: Line ~69 (after scaling = int(round(abs(scaling))))
+================================================================================
+
+INSERT AFTER:
+    scaling = int(round(abs(scaling)))
+
+NEW CODE:
+    L1_pnlty = abs(L1_pnlty)
+    
+    # No "culling" with L1 regularization
+    if L1_pnlty > 0:
+        pCull = 0
+
+================================================================================
+CHANGE 4: Update fit_model Calls in Main Loop
+Location: Line ~140 (inside main culling loop, for io in range(nOut))
+================================================================================
+
+OLD CODE:
+        coeff[io], condB[io, iter] = fit_model(trainZx, trainZy[io, :], 
+                                                 order[io], nTerm[io], mTrain)
+
+NEW CODE:
+        coeff[io], condB[io, iter] = fit_model(trainZx, trainZy[io, :], 
+                                                 order[io], nTerm[io], mTrain,
+                                                 L1_pnlty, basis_fctn)
+
+================================================================================
+CHANGE 5: Update compute_model Calls
+Location: Line ~145-146 (after fit_model calls)
+================================================================================
+
+OLD CODE:
+    trainModelY, B = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, 
+                                    trainX, scaling)
+    testModelY, _ = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, 
+                                   testX, scaling)
+
+NEW CODE:
+    trainModelY, B = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, 
+                                    trainX, scaling, basis_fctn)
+    testModelY, _ = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, 
+                                   testX, scaling, basis_fctn)
+
+================================================================================
+CHANGE 6: Update Culling Logic
+Location: Line ~180 (end of culling loop, after convergence check)
+================================================================================
+
+OLD CODE:
+        order, nTerm, coeffCOV = cull_model(coeff, order, coeffCOV, tol)
+
+NEW CODE:
+        if L1_pnlty == 0:
+            order, nTerm, coeffCOV = cull_model(coeff, order, coeffCOV, tol)
+
+================================================================================
+CHANGE 7: fit_model Function Signature
+Location: Line ~635 (function definition)
+================================================================================
+
+OLD CODE:
+def fit_model(Zx, Zy, order, nTerm, mData):
+
+NEW CODE:
+def fit_model(Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn):
+
+================================================================================
+CHANGE 8: fit_model Function Body
+Location: Line ~635-665 (entire fit_model function)
+================================================================================
+
+OLD CODE:
+def fit_model(Zx, Zy, order, nTerm, mData):
+    '''
+    [ coeff, condB ] = fit_model( Zx, Zy, order, nTerm, mData )
+    ...docstring...
+    '''
+    
+    print('Fit The Model ...')
+    
+    B = build_basis(Zx, order)
+    
+    coeff = np.zeros(nTerm)
+    
+    coeff = np.linalg.lstsq(B, Zy, rcond=None)[0]
+    
+    condB = np.linalg.cond(B)
+    
+    print(f'  condition number of model basis matrix = {condB:6.1f}')
+    
+    return coeff, condB
+
+NEW CODE:
+def fit_model(Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn):
+    '''
+    [ coeff, condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn )
+    Fit the polynomial model to the data using 
+    ordinary least squares or L1 regularization
+    
+    INPUT       DESCRIPTION                                           DIMENSION
+    --------    ---------------------------------------------------  -----------
+     Zx         scaled input (explanatory) data                       nx x mData
+     Zy         scaled output (response) data                          1 x mData
+     order      powers on each explanatory variable for each term   nTerm x nx
+     nTerm      number of terms in the polynomial model                1 x 1
+     mData      number of data points                                  1 x 1
+     L1_pnlty   L1 regularization coefficient                          1 x 1
+     basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
+    
+    OUTPUT      DESCRIPTION                                           DIMENSION
+    --------    ---------------------------------------------------  -----------
+     coeff      vector of model coefficients                         nTerm x 1
+     condB      condition number of the model basis                    1 x 1
+    '''
+    
+    print(f'Fit The Model ... with L1_pnlty = {L1_pnlty}')
+    
+    B = build_basis(Zx, order, basis_fctn)
+    
+    nTerms = B.shape[1]
+    
+    coeff = np.zeros(nTerm)
+    
+    if L1_pnlty > 0:
+        # Use L1_fit for regularization
+        try:
+            from L1_fit import L1_fit
+            from L1_plots import L1_plots
+            
+            # Zy needs to be column vector for L1_fit
+            Zy_col = Zy.reshape(-1, 1) if Zy.ndim == 1 else Zy.reshape(-1, 1)
+            
+            coeff, mu, nu, cvg_hst = L1_fit(B, Zy_col, L1_pnlty, w=0)
+            
+            # Optional: plot L1 convergence
+            # L1_plots(B, coeff, Zy_col, cvg_hst, L1_pnlty, 0, fig_no=7000)
+            
+        except ImportError:
+            print('WARNING: L1_fit not found, using OLS instead')
+            coeff = np.linalg.lstsq(B, Zy, rcond=None)[0]
+    else:
+        # Use ordinary least squares / SVD
+        coeff = np.linalg.lstsq(B, Zy, rcond=None)[0]
+    
+    condB = np.linalg.cond(B)
+    
+    print(f'  condition number of model basis matrix = {condB:6.1f}')
+    
+    return coeff, condB
+
+================================================================================
+CHANGE 9: build_basis Function Signature and Body
+Location: Line ~580 (function definition)
+================================================================================
+
+OLD CODE:
+def build_basis(Zx, order):
+    '''
+    B = build_basis( Zx, order ) 
+    ...docstring...
+    '''
+    
+    mData = Zx.shape[1]
+    nTerm, nInp = order.shape
+    B = np.ones((mData, nTerm))
+    
+    max_order = int(np.max(order))
+    
+    for it in range(nTerm):
+        B[:, it] = polynomial_product(order[it, :], Zx.T, max_order)
+    
+    return B
+
+NEW CODE:
+def build_basis(Zx, order, basis_fctn='H'):
+    '''
+    B = build_basis( Zx, order, basis_fctn ) 
+    compute matrix of model basis vectors
+    options: power-polynomial basis, Hermite function basis, or Legendre basis
+    
+    INPUT       DESCRIPTION                                           DIMENSION
+    --------    ---------------------------------------------------  -----------
+     Zx         matrix of input (explanatory) variables             nInp x mData
+     order      powers for each variable on each term of the model  nTerm x nInp
+     basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
+    
+    OUTPUT      DESCRIPTION                                           DIMENSION
+    --------    ---------------------------------------------------  -----------
+      B         matrix basis vectors for the polynomial model       mData x nTerm
+    '''
+    
+    mData = Zx.shape[1]
+    nTerm, nInp = order.shape
+    B = np.ones((mData, nTerm))
+    
+    max_order = int(np.max(order))
+    
+    if basis_fctn == 'P':
+        # Power polynomials
+        for it in range(nTerm):
+            B[:, it] = np.prod(Zx.T ** order[it, :], axis=1)
+    else:
+        # Legendre or Hermite
+        for it in range(nTerm):
+            B[:, it] = polynomial_product(order[it, :], Zx.T, max_order, basis_fctn)
+    
+    return B
+
+================================================================================
+CHANGE 10: polynomial_product Function Signature
+Location: Line ~600 (function definition)
+================================================================================
+
+OLD CODE:
+def polynomial_product(powers, Zx, max_order):
+
+NEW CODE:
+def polynomial_product(powers, Zx, max_order, basis_fctn='H'):
+
+================================================================================
+CHANGE 11: polynomial_product Function Body
+Location: Line ~600-620 (inside function)
+================================================================================
+
+OLD CODE (inside polynomial_product):
+    for i in range(nInp):
+        if powers[i] > 0:
+            result *= hermite(int(powers[i]), Zx[:, i])
+
+NEW CODE (inside polynomial_product):
+    for i in range(nInp):
+        if powers[i] > 0:
+            if basis_fctn == 'H':
+                result *= hermite(int(powers[i]), Zx[:, i])
+            elif basis_fctn == 'L':
+                result *= legendre(int(powers[i]), Zx[:, i])
+
+================================================================================
+CHANGE 12: compute_model Function Signature
+Location: Line ~690 (function definition)
+================================================================================
+
+OLD CODE:
+def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, X, scaling):
+
+NEW CODE:
+def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, X, scaling, basis_fctn='H'):
+
+================================================================================
+CHANGE 13: compute_model Function Body - Update build_basis Call
+Location: Line ~730 (inside compute_model, in loop)
+================================================================================
+
+OLD CODE:
+        B = build_basis(Zx, order[io])
+
+NEW CODE:
+        B = build_basis(Zx, order[io], basis_fctn)
+
+================================================================================
+INSERT NEW FUNCTION: Add legendre Function
+Location: After hermite function (around line ~900)
+================================================================================
+
+INSERT THIS COMPLETE FUNCTION:
+
+def legendre(n, z):
+    '''
+    Compute Legendre polynomial of order n evaluated at points z
+    
+    Uses recurrence relation:
+    P_0(z) = 1
+    P_1(z) = z  
+    P_{n+1}(z) = ((2n+1)*z*P_n(z) - n*P_{n-1}(z)) / (n+1)
+    
+    Parameters
+    ----------
+    n : int
+        Order of Legendre polynomial
+    z : array_like
+        Points at which to evaluate polynomial
+    
+    Returns
+    -------
+    P_n : ndarray
+        Legendre polynomial P_n(z)
+    
+    Examples
+    --------
+    >>> z = np.linspace(-1, 1, 100)
+    >>> P0 = legendre(0, z)  # Returns ones
+    >>> P1 = legendre(1, z)  # Returns z
+    >>> P2 = legendre(2, z)  # Returns (3*z^2 - 1)/2
+    
+    Notes
+    -----
+    Legendre polynomials are orthogonal on [-1, 1]:
+    ∫_{-1}^{1} P_m(z) P_n(z) dz = 2/(2n+1) * δ_{mn}
+    '''
+    
+    z = np.asarray(z)
+    
+    if n == 0:
+        return np.ones_like(z)
+    elif n == 1:
+        return z
+    else:
+        # Use recurrence relation for n >= 2
+        P_nm1 = np.ones_like(z)  # P_0(z)
+        P_n = z                   # P_1(z)
+        
+        for k in range(1, n):
+            P_np1 = ((2*k + 1) * z * P_n - k * P_nm1) / (k + 1)
+            P_nm1 = P_n
+            P_n = P_np1
+        
+        return P_n
+
+================================================================================
+SUMMARY OF CHANGES
+================================================================================
+
+Total changes: 13 modifications + 1 new function
+
+Key additions:
+1. L1_pnlty parameter (default: 1.0)
+2. basis_fctn parameter (default: 'H')
+3. L1_fit integration in fit_model()
+4. Legendre polynomial function
+5. Power polynomial basis option
+6. Basis function switching in build_basis()
+7. Conditional culling (only when L1_pnlty == 0)
+
+Files affected:
+- mimoSHORSA.py (this patch file)
+
+Testing needed:
+- Test with L1_pnlty = 0 (should behave like old version)
+- Test with L1_pnlty > 0 (L1 regularization)
+- Test basis_fctn = 'H' (Hermite - default)
+- Test basis_fctn = 'L' (Legendre)  
+- Test basis_fctn = 'P' (Power)
+- Cross-validate with MATLAB version
+
+================================================================================
+END OF PATCH FILE
+================================================================================
