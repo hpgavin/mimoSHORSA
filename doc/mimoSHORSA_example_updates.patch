@@ -179,6 +179,7 @@ def example_5_basis_comparison():
     
     return results
 
+
 ================================================================================
 INSERT NEW EXAMPLE: L1 vs COV Culling Comparison
 Location: Add as new function in example file
