@@ -863,7 +863,7 @@ function [MDcorr, coeffCOV, R2adj, AIC] = evaluate_model( B, coeff, dataX, dataY
     Std_Err_Coeff = sqrt( ( r*r' ) * diag(inv(B{io}'*B{io})) / (mData-nTerm) ); 
  
     % coefficient of variation of each coefficient for model "io"
-    coeffCOV{io} = abs( Std_Err_Coeff ./ coeff{io} );
+    coeffCOV{io} =  Std_Err_Coeff ./ ( abs(coeff{io}) + 1e-6 );
     coeffCOV{io}(find(abs(coeff{io})<1e-6)) = 1e-3; 
 
     AIC(io) = 0;   % add AIC here

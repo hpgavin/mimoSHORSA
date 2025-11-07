@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import time as time
 from datetime import datetime, timedelta
+from rainbow import rainbow 
+from format_plot import format_plot
 
-def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=1, L1_pnlty=1.0, basis_fctn='H'):
+def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=1, L1_pnlty=1.0, basis_fctn='H'): 
     '''
     [ order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY ] = mimoSHORSA( dataX, dataY, maxOrder, pTrain, pCull, tol, scaling )
     
@@ -96,7 +97,9 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
     # scale data matrices trainX and trainY separately since using 
     # the covariance between trainX and trainY in the model is "cheating"
     trainZx, meanX, trfrmX = scale_data(trainX, scaling, 0)
+    print('aaa')
     trainZy, meanY, trfrmY = scale_data(trainY, scaling, 0)
+    print('bbb')
     
     if scaling > 0:  # remove each column of trainZx and trainZy with outliers
         XY = np.vstack([trainZx, trainZy])
@@ -149,8 +152,6 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         trainModelY, B = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, trainX, scaling, basis_fctn)
         testModelY, _  = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, testX, scaling, basis_fctn)
 
-        print("..a\n") 
-
         
         # evaluate the model for the training data and the testing data
         trainMDcorr[:, iter], coeffCOV, _, _ = evaluate_model(B, coeff, trainY, trainModelY, trainFigNo, 'train')
@@ -161,23 +162,24 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
         
         print_model_stats(iter, coeff, order, coeffCOV, testMDcorr[:, iter], R2adj, scaling, maxCull)
         
-        plt.ion() # interactive mode: on
-        for io in range(nOut):
-            plt.figure(400 + io)
-            format_plot(18, 4, 8)
-            cMap = rainbow(nOut)
-            plt.clf()
-            plt.semilogy(np.arange(1, nTerm[io] + 1), coeffCOV[io], 'o', color=cMap[io, :])
-            for ii in range(nTerm[io]):
-                plt.text(ii + 1, 0.85 * coeffCOV[io][ii], 
-                        f' {order[io][ii, :]}', fontsize=10)
-            plt.ylabel('coefficient of variation')
-            plt.xlabel('term number')
-            plt.title(f'Y_{io}, ρ_train = {trainMDcorr[io, iter]:.3f}, ' +
-                     f'ρ_test = {testMDcorr[io, iter]:.3f}, cond(B) = {condB[io, iter]:.1f}')
-        
-        plt.draw()
-        plt.pause(1.001)
+        if L1_pnlty == 0:
+            plt.ion() # interactive mode: on
+            for io in range(nOut):
+                plt.figure(400 + io)
+                format_plot(18, 4, 8)
+                cMap = rainbow(nOut)
+                plt.clf()
+                plt.semilogy(np.arange(1, nTerm[io] + 1), coeffCOV[io], 'o', color=cMap[io, :])
+                for ii in range(nTerm[io]):
+                    plt.text(ii + 1, 0.85 * coeffCOV[io][ii], 
+                            f' {order[io][ii, :]}', fontsize=10)
+                plt.ylabel('coefficient of variation')
+                plt.xlabel('term number')
+                plt.title(f'Y_{io}, ρ_train = {trainMDcorr[io, iter]:.3f}, ' +
+                        f'ρ_test = {testMDcorr[io, iter]:.3f}, cond(B) = {condB[io, iter]:.1f}')
+            
+            plt.draw()
+            plt.pause(1.001)
         
         if (testMDcorr[:, iter] > 0).all() and (np.max(coeffCOVmax[:, iter]) < tol):
             maxCull = iter + 1
@@ -189,27 +191,29 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
     # ------------ cull uncertain terms from the model
     
     # plot correlations and coefficients of variation
-    plt.figure(500)
-    plt.clf()
-    cMap = rainbow(nOut)
-    format_plot(18, 2, 4)
+    if L1_pnlty == 0: 
+        plt.ion() # interactive mode: on
+        plt.figure(500)
+        plt.clf()
+        cMap = rainbow(nOut)
+        format_plot(18, 2, 4)
     
-    plt.subplot(2, 1, 1)
-    for io in range(nOut):
-        plt.plot(np.arange(1, maxCull + 1), trainMDcorr[io, :maxCull], 'o', color=cMap[io, :])
-        plt.plot(np.arange(1, maxCull + 1), testMDcorr[io, :maxCull], 'x', color=cMap[io, :])
-    plt.ylabel('model-data correlation')
-    plt.legend(['train', 'test'], loc='center left')
-    
-    plt.subplot(2, 1, 2)
-    for io in range(nOut):
-        plt.semilogy(np.arange(1, maxCull + 1), condB[io, :maxCull], 'o', color=cMap[io, :])
-        plt.semilogy(np.arange(1, maxCull + 1), coeffCOVmax[io, :maxCull], 'x', color=cMap[io, :])
-    plt.legend(['cond(B)', 'max(c.o.v.)'], loc='center right')
-    plt.ylabel('maximum c.o.v.')
-    plt.xlabel('model reduction')
-    
-    plt.show(block=False)
+        plt.subplot(2, 1, 1)
+        for io in range(nOut):
+            plt.plot(np.arange(1, maxCull + 1), trainMDcorr[io, :maxCull], 'o', color=cMap[io, :])
+            plt.plot(np.arange(1, maxCull + 1), testMDcorr[io, :maxCull], 'x', color=cMap[io, :])
+        plt.ylabel('model-data correlation')
+        plt.legend(['train', 'test'], loc='center left')
+        
+        plt.subplot(2, 1, 2)
+        for io in range(nOut):
+            plt.semilogy(np.arange(1, maxCull + 1), condB[io, :maxCull], 'o', color=cMap[io, :])
+            plt.semilogy(np.arange(1, maxCull + 1), coeffCOVmax[io, :maxCull], 'x', color=cMap[io, :])
+        plt.legend(['cond(B)', 'max(c.o.v.)'], loc='center right')
+        plt.ylabel('maximum c.o.v.')
+        plt.xlabel('model reduction')
+        
+        plt.show(block=False)
     
     return order, coeff, meanX, meanY, trfrmX, trfrmY, testModelY, testX, testY
 
@@ -228,12 +232,12 @@ def split_data(dataX, dataY, pTrain):
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-    trainX      matrix of  input data for training                    nx x mTrain
-    trainY      matrix of output data for training                    ny x mTrain
-    mTrain      number of observations in the training set             1 x 1
-    testX       matrix of  input data for testing                     nx x mTest
-    testY       matrix of output data for testing                     ny x mTest
-    mTest       number of observations in the testing set              1 x 1
+     trainX     matrix of  input data for training                    nx x mTrain
+     trainY     matrix of output data for training                    ny x mTrain
+     mTrain     number of observations in the training set             1 x 1
+     testX      matrix of  input data for testing                     nx x mTest
+     testY      matrix of output data for testing                     ny x mTest
+     mTest      number of observations in the testing set              1 x 1
     '''
     
     nInp, mData = dataX.shape   # number of columns in dataX is mData
@@ -247,6 +251,7 @@ def split_data(dataX, dataY, pTrain):
     
     trainX = dataX[:, idtrainX]
     trainY = dataY[:, idtrainX]
+    print(f'dim_train_Y = {trainY.shape})
     
     testX = dataX[:, idtestX]
     testY = dataY[:, idtestX]
@@ -368,6 +373,8 @@ def scale_data(Data, scaling, flag):
     elif scaling == 2:  # subtract mean and decorrelate
         meanD = np.mean(Data, axis=1, keepdims=True)
         covData = np.cov(Data)
+        dim_cov_data = covData.shape
+        print(f'dim_cov_data = {dim_cov_data}')
         eVal, eVec = np.linalg.eig(covData)
         T = eVec @ np.sqrt(np.diag(eVal))
     
@@ -463,6 +470,7 @@ def scatter_data(dataX, dataY, figNo=100, varNames=None):
     nTotalVars = nInp + nOut
     
     # Create figure with subplots
+    plt.ion() # interactive mode: on
     fig = plt.figure(figNo, figsize=(3*nTotalVars, 3*nTotalVars))
     plt.clf()
     
@@ -947,15 +955,17 @@ def evaluate_model(B, coeff, dataY, modelY, figNo, txt):
         Std_Err_Coeff = np.sqrt((r @ r.T) * BtB_inv_diag / (mData - nTerm))
         
         # coefficient of variation of each coefficient for model "io"
-        coeffCOV[io] = np.abs(Std_Err_Coeff / coeff[io].flatten())
+        coeffCOV[io] = Std_Err_Coeff / ( np.abs(coeff[io].flatten()) + 1e-6 )
+        coeffCOV[io][np.abs(coeff[io]) < 1e-6] = 1e-3
         
         AIC[io] = 0   # add AIC here
     
     if figNo:
+        plt.ion() # interactive mode: on
         cMap = rainbow(nOut)
         plt.figure(figNo)
-        format_plot(18, 1, 3)
-        ax = [np.min(dataY), np.max(dataY), np.min(dataY), np.max(dataY)]
+        format_plot(16, 1, 3)
+        ax = [ np.min(dataY), np.max(dataY), np.min(dataY), np.max(dataY) ]
         plt.clf()
         for io in range(nOut):
             plt.plot(modelY[io, :], dataY[io, :], 'o', color=cMap[io, :])
@@ -965,18 +975,19 @@ def evaluate_model(B, coeff, dataY, modelY, figNo, txt):
         plt.ylabel('Y data')
         
         tx = 0.00
-        ty = 1.0 - 0.00 * io
-        plt.text(tx * ax[1] + (1 - tx) * ax[0], ty * ax[3] + (1 - ty) * ax[2],
+        ty = 1.0 - 0.05 * (io+1)
+        plt.text(tx*ax[1] + (1-tx)*ax[0], ty*ax[3] + (1-ty)*ax[2],
                 f'{nTerm} model terms')
         
         for io in range(nOut):
-            tx = 0.75
-            ty = 0.4 - 0.1 * io
-            plt.text(tx * ax[1] + (1 - tx) * ax[0], ty * ax[3] + (1 - ty) * ax[2],
+            tx = 0.55
+            ty = 0.5 - 0.2 * (io+1)
+            plt.text(tx*ax[1] + (1-tx)*ax[0], ty*ax[3] + (1-ty)*ax[2],
                     f'ρ_{{x,y{io}}} = {MDcorr[io]:.3f}', color=cMap[io, :])
-            ty = 0.4 + 0.0 * io
-            plt.text(tx * ax[1] + (1 - tx) * ax[0], ty * ax[3] + (1 - ty) * ax[2],
-                    f'txt', color=cMap[io, :])
+#                   '$\rho_{{x,y{io}}}$ = {MDcorr[io]:.3f}', color=cMap[io, :])
+            ty = 0.5 + 0.4 * (io+1)
+            plt.text(tx*ax[1] + (1-tx)*ax[0], ty*ax[3] + (1-ty)*ax[2],
+                    f'{txt}', color=cMap[io, :])
         
         plt.show(block=False)
     
