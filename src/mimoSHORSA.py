@@ -116,7 +116,7 @@ def mimoSHORSA(dataX, dataY, maxOrder=3, pTrain=50, pCull=30, tol=0.10, scaling=
     
     maxOrder = maxOrder * np.ones(nInp, dtype=int)  # same maximum order for all variables
     
-    order, nTerm = mixed_term_powers(maxOrder, nInp, nOut)
+    order, nTerm = mixed_term_orders(maxOrder, nInp, nOut)
     
     # initialize variables
     maxCull = max(1,int(round(pCull * nTerm[0]))) # maximum number of terms to cull
@@ -536,9 +536,9 @@ def scatter_data(dataX, dataY, figNo=100, varNames=None):
     return None
 
 
-def mixed_term_powers(maxOrder, nInp, nOut):
+def mixed_term_orders(maxOrder, nInp, nOut):
     '''
-    [ order , nTerm ] = mixed_term_powers( maxOrder, nInp, nOut )
+    [ order , nTerm ] = mixed_term_orders( maxOrder, nInp, nOut )
     specify the exponents on each input variable for every term in the model,
     and the total number of terms, nTerm
     
@@ -550,10 +550,12 @@ def mixed_term_powers(maxOrder, nInp, nOut):
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-    order       list of matrices of model orders for each output
-                indicating powers present in each model terms      {nTerm x nInp}
+    order       list of 2D matrices of the orders 
+                indicating the orders of each explanatory variable in
+                in each polynomial term                             {nTerm x nInp}
+                one matrix for each output
                 initially, these matrices are all the same 
-    nTerm       number of polynomial terms in the model                 nOut x 1
+    nTerm       number of polynomial terms in the model               nOut x 1
     
     The matrix 'order' indicates which mixed term power-products are present
     in each term of the model. 
@@ -605,7 +607,7 @@ def mixed_term_powers(maxOrder, nInp, nOut):
     return order, nTerm
 
 
-def polynomial_product(powers, Zx, max_order, basis_fctn='H'):
+def polynomial_product(order, Zx, max_order, basis_fctn='H'):
     '''
     psyProduct = polynomial_product( order, Zx, basis_fctn )
     compute the product of hermite functions of given orders (from 0 to 5)
@@ -613,8 +615,7 @@ def polynomial_product(powers, Zx, max_order, basis_fctn='H'):
     
     INPUT       DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-    order       vector model orders of powers present in one term
-                of the polynomial model                               1 x nInp
+    order       expxonents present in each polynomial term             1 x nInp
      Zx         matrix of scaled input (explanatory) variables      mData x nInp
      basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
     
@@ -623,15 +624,15 @@ def polynomial_product(powers, Zx, max_order, basis_fctn='H'):
     psyProduct  vector of product of hermite polynomials             mData x 1
     '''
     
-    nInp = len(order)                # number of input (explanatory) variables
+    nInp = len(order) # number of input (explanatory) variables
     psyProduct = np.ones(Zx.shape[0])  # initialize to vector of 1
 
     for i in range(nInp):
-        if powers[i] > 0:
+        if order[i] > 0:
             if basis_fctn == 'H':
-                result *= hermite(int(powers[i]), Zx[:, i])
+                psyProduct *= hermite( order[i], Zx[:, i], max_order )
             elif basis_fctn == 'L':
-                result *= legendre(int(powers[i]), Zx[:, i], max_order)
+                psyProduct *= legendre( order[i], Zx[:, i] )
     
     return psyProduct
 
@@ -644,8 +645,8 @@ def build_basis(Zx, order, basis_fctn='H'):
 
     INPUT       DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------  -----------
-     Zx         matrix of input (explanatory) variables             nInp x mData
-     order      powers for each variable on each term of the model  nTerm x nInp
+     Zx         matrix of input (explanatory) variables               nInp x mData
+     order      orders for each variable in each polynomial term      nTerm x nInp
      basis_fctn 'H': Hermite, 'L': Legendre, 'P': Power polynomial
 
     OUTPUT      DESCRIPTION                                           DIMENSION
@@ -689,24 +690,24 @@ def hermite(n, z, N):
     
     INPUT       DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-    n           the polynomial order of a hermite function             1 x 1
-    z           vector of input (explanatory) variables                1 x mData  
-    N           largest order in the full expansion                    1 x 1
+    n           the polynomial order of a hermite function            1 x 1
+    z           vector of input (explanatory) variables               1 x mData
+    N           largest order in the full expansion                   1 x 1
     
     OUTPUT      DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-     psy        a hermite function of specified order at given values  1 x mData
+     psy        a hermite function of specified order at given values 1 x mData
     '''
     
     pi4 = np.pi**(0.25)
     ez2 = np.exp(-0.5 * z**2)
 
-    N = N+2;     # expand the domain of extrapolation 
+    z0 = N+2;     # expand the domain of extrapolation 
 
     if n == 0:
-        psy = exp(-(z/N)**(6*N))
+        psy = exp(-(z/z0)**(6*z0))
     elif n == 1:
-        psy = (z/N) * exp(-(z/N)**(6*N)) 
+        psy = (z/z0) * exp(-(z/z0)**(6*z0)) 
     elif n == 2:
         psy = 1/pi4 * ez2
     elif n == 3:
@@ -737,21 +738,18 @@ def hermite(n, z, N):
 
 def legendre(n, z):
     '''
-    Compute Legendre polynomial of order n evaluated at points z
+    Compute a Legendre polynomial of order n evaluated at points z
     Legendre polynomials are orthogonal on [-1, 1]:
-    integral_{-1}^{1} P_m(z) P_n(z) dz = 2/(2n+1) * δ_{mn}
+    integral_{-1}^{1} P_m(z) P_n(z) dz = 2/(2n+1) * δ{mn}
 
-   Parameters
-    ----------
-    n : int
-        Order of Legendre polynomial
-    z : array_like
-        Points at which to evaluate polynomial
-
-    Returns
-    -------
-    P_n : ndarray
-        Legendre polynomial P_n(z)
+    INPUT       DESCRIPTION                                           DIMENSION
+    --------    ---------------------------------------------------   ---------
+    n           the polynomial order of a legendre polynomial          1 x 1
+    z           vector of input (explanatory) variables                1 x mData
+    
+    OUTPUT      DESCRIPTION                                           DIMENSION
+    --------    ---------------------------------------------------   ---------
+     psy        a legendre polynomial of given order at given values  1 x mData
     '''
 
     z = np.asarray(z)
@@ -761,23 +759,23 @@ def legendre(n, z):
     elif n == 1:
         return z
     elif n == 2:
-      psy = (    3*z**2 -     1  )/2;
+        psy = (    3*z**2 -     1  )/2;
     elif n == 3:
-      psy = (    5*z**3 -     3*z)/2;
+        psy = (    5*z**3 -     3*z)/2;
     elif n == 4:
-      psy = (   35*z**4 -    30*z**2 +    3  )/8;
+        psy = (   35*z**4 -    30*z**2 +    3  )/8;
     elif n == 5:
-      psy = (   63*z**5 -    70*z**3 +   15*z)/8;
+        psy = (   63*z**5 -    70*z**3 +   15*z)/8;
     elif n == 6:
-      psy = (  231*z**6 -   315*z**4 +  105*z**2 -    5  )/16;
+        psy = (  231*z**6 -   315*z**4 +  105*z**2 -    5  )/16;
     elif n == 7:
-      psy = (  429*z**7 -   693*z**5 +  315*z**3 -   35*z)/16;
+        psy = (  429*z**7 -   693*z**5 +  315*z**3 -   35*z)/16;
     elif n == 8:
-      psy = ( 6435*z**8 - 12012*z**6 + 6930*z**4 - 1260*z**2+  35   )/128;
+        psy = ( 6435*z**8 - 12012*z**6 + 6930*z**4 - 1260*z**2+  35   )/128;
     elif n == 9:
-      psy = (12155*z**9 - 25740*z**7 +18018*z**5 - 4620*z**3+ 315*z )/128;
+        psy = (12155*z**9 - 25740*z**7 +18018*z**5 - 4620*z**3+ 315*z )/128;
     elif n == 10:
-      psy = (46189*z**10-109395*z**8 +90090*z**6 -30030*z**4+3465.*z**2-63)/256;
+        psy = (46189*z**10-109395*z**8 +90090*z**6 -30030*z**4+3465.*z**2-63)/256;
     else:
         raise ValueError(f'Legendre function implemented only for orders 0-10, got order={order}')
 
@@ -787,14 +785,14 @@ def legendre(n, z):
 def fit_model(Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn):
     '''
     [ coeff , condB ] = fit_model( Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn )
-    Fit the polynomial model to the data using 
-    ordinary least squares or L1 regularization
+    via singular value decomposition without regularization, or
+    via quadratic programming with L1 regularization
     
     INPUT       DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-     Zx         scaled input (explanatory) data                         nx x mData
-     Zy         scaled output (dependent) data                          1 x mData
-     order      powers on each explanatory variable for each term    nTerm x nx
+     Zx         scaled input (explanatory) data                      nx x mData
+     Zy         scaled output (dependent) data                        1 x mData
+     order      order of each explanatory variable in each term   nTerm x nx
      nTerm      number of terms in the polynomial model                  1 x 1
      mData      number of data points (not used, kept for compatibility) 1 x 1
      L1_pnlty   L1 regularization coefficient                            1 x 1
@@ -808,6 +806,8 @@ def fit_model(Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn):
     '''
     
     print(f'Fit The Model ... with L1_pnlty = {L1_pnlty}')
+
+    B = build_basis( Zx, order, basis_fctn )
 
     if L1_pnlty > 0:
         # Use L1_fit for regularization
@@ -836,20 +836,16 @@ def fit_model(Zx, Zy, order, nTerm, mData, L1_pnlty, basis_fctn):
 
     return coeff, condB
 
-    print(f'  condition number of model basis matrix = {condB:6.1f}')
-    
-    return coeff, condB
-
 
 def compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling, basis_fctn='H'):
     '''
     [ modelY, B ] = compute_model(order, coeff, meanX, meanY, trfrmX, trfrmY, dataX, scaling,basis_fctn)
-    compute a multivariate power-polynomial model 
+    compute a multivariate polynomial model 
     
     INPUT       DESCRIPTION                                           DIMENSION
     --------    ---------------------------------------------------   ---------
-     order      list of powers on each explanatory variable for each term  {nTerm x nInp}
-     coeff      list of model coefficient vectors                          {nTerm x 1}
+     order      list of order of each explanatory variable in each term {nTerm x nInp}
+     coeff      list of model coefficient vectors                       {nTerm x 1}
      meanX      mean of pre-scaled input  (explanatory) variables     nInp x 1 
      meanY      mean of pre-scaled output  (dependent)  variables     nOut x 1 
      trfrmX     transformation matrix for input variables             nInp x nInp 
@@ -996,7 +992,7 @@ def print_model_stats(iter, coeff, order, coeffCOV, MDcorr, R2adj, scaling, maxC
     --------    ---------------------------------------------------   ---------
     iter        current iteration number                                  1 x 1
     coeff       list of coefficient vectors of each model            {nTerm x 1}
-    order       powers on each explanatory variable for each term    {nTerm x nInp}
+    order       order of each explanatory variable in each term      {nTerm x nInp}
     coeffCOV    list of coefficient of variation of each coefficient {1 x nTerm}
     MDcorr      model-data correlation for each output               nOut x 1
     R2adj       adjusted R-squared for each output                   nOut x 1
@@ -1056,17 +1052,17 @@ def cull_model(coeff, order, coeffCOV, tol):
     [ order, nTerm, coeffCOV ] = cull_model( coeff, order, coeffCOV, tol )
     remove the term from the model that has the largest coeffCOV
     
-    INPUT       DESCRIPTION                                           DIMENSION
-    --------    ---------------------------------------------------   ---------
-     coeff      list of coefficient vectors of each model            {nTerm x 1}  
-     order      powers on each explanatory variable for each term    {nTerm x nInp}
+    INPUT       DESCRIPTION                                         DIMENSION
+    --------    -------------------------------------------------   ---------
+     coeff      list of coefficient vectors of each model         {nTerm x 1}  
+     order      order of each explanatory variable in each term   {nTerm x nInp}
     coeffCOV    list of coefficient of variation of
-                each model coefficient of each model                 {1 x nTerm}
-     tol        tolerance for an acceptable coeffCOV                       1 x 1
+                each model coefficient of each model               {1 x nTerm}
+     tol        tolerance for an acceptable coeffCOV                1 x 1
     
-    OUTPUT      DESCRIPTION                                           DIMENSION
-    --------    ---------------------------------------------------   ---------
-     order      retained powers on each explanatory variable for each term  {nTerm x nInp}
+    OUTPUT      DESCRIPTION                                         DIMENSION
+    --------    -------------------------------------------------   ---------
+     order      retained order of each explanatory variable in each term  {nTerm x nInp}
      nTerm      number of terms in each polynomial model                  1 x nOut
     coeffCOV    list of coefficient of variation of
                 each model coefficient of each culled model               {1 x nTerm}
@@ -1096,52 +1092,6 @@ def cull_model(coeff, order, coeffCOV, tol):
     return order, nTerm, coeffCOV
 
 
-def rainbow(n):
-    '''
-    Generate rainbow colormap with n colors
-    Returns an n x 3 array of RGB colors spanning the rainbow spectrum
-    
-    INPUT       DESCRIPTION                                           DIMENSION
-    --------    ---------------------------------------------------   ---------
-    n           number of colors to generate                              1 x 1
-    
-    OUTPUT      DESCRIPTION                                           DIMENSION
-    --------    ---------------------------------------------------   ---------
-    cMap        RGB color array                                           n x 3
-    '''
-    
-    # Use matplotlib's rainbow/jet colormap
-    cmap = cm.get_cmap('rainbow', n)
-    colors = np.array([cmap(i)[:3] for i in range(n)]) # Get RGB, exclude alpha
-    
-    return colors
-
-
-def format_plot(fontsize, linewidth, markersize):
-    '''
-    Format plot with specified parameters
-    Sets default matplotlib rcParams for consistent plot styling
-    
-    INPUT       DESCRIPTION                                           DIMENSION
-    --------    ---------------------------------------------------   ---------
-    fontsize    font size for labels and text                            1 x 1
-    linewidth   line width for plots                                     1 x 1
-    markersize  marker size for scatter plots                            1 x 1
-    '''
-    
-    plt.rcParams.update({
-        'font.size': fontsize,
-        'axes.labelsize': fontsize,
-        'axes.titlesize': fontsize,
-        'xtick.labelsize': fontsize - 2,
-        'ytick.labelsize': fontsize - 2,
-        'legend.fontsize': fontsize - 2,
-        'lines.linewidth': linewidth,
-        'lines.markersize': markersize,
-        'axes.linewidth': linewidth / 2
-    })
-
-
 def IDWinterp(Zx, Zy, zMap, p, k, tol):
     '''
     Inverse Distance Weighting interpolation
@@ -1149,4 +1099,5 @@ def IDWinterp(Zx, Zy, zMap, p, k, tol):
     '''
     pass
 
-# updated 2006-01-29, 2007-02-21, 2007-03-06, 2009-10-14, 2022-11-19 2023-02-27, 2023-05-31 2025-11-06
+
+# updated 2006-01-29, 2007-02-21, 2007-03-06, 2009-10-14, 2022-11-19 2023-02-27, 2023-05-31 2025-11-07
