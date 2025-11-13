@@ -1,5 +1,7 @@
 # mimoSHORSA
 
+**mimoSHORSA has moved to http://github.com/hpgavin/multivarious** 
+
 **m**ulti-**i**nput **m**ulti-**o**tput **S**tochastic **H**igh **O**rder **R**esponse **S**urface **A**lgorithm
 
 A sophisticated polynomial regression method using Hermite function basis with adaptive model reduction for high-dimensional data.
